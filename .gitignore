@@ -56,3 +56,6 @@ GoogleService-Info.plist
 supabase/.temp/
 supabase/.branches/
 supabase/functions/.env
+
+# Generated database setup file (rebuild with supabase/make_setup_sql.sh)
+supabase/setup_all.sql
