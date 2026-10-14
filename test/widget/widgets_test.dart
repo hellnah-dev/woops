@@ -17,10 +17,12 @@ Widget _app(Widget child, {List<Override> overrides = const []}) => ProviderScop
 );
 
 void main() {
-  testWidgets('AppLogo shows a placeholder until assets/branding/logo.png exists', (tester) async {
+  testWidgets('AppLogo shows the bundled logo at the requested size', (tester) async {
     await tester.pumpWidget(_app(const Scaffold(body: Center(child: AppLogo(size: 100)))));
     await tester.pumpAndSettle();
-    expect(find.text('LOGO'), findsOneWidget);
+    final image = tester.widget<Image>(find.byType(Image));
+    expect((image.image as AssetImage).assetName, AppLogo.assetPath);
+    expect(find.text('LOGO'), findsNothing); // the placeholder is only for a missing file
     expect(tester.getSize(find.byType(AppLogo)), const Size(100, 100));
   });
 
