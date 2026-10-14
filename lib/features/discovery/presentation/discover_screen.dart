@@ -7,6 +7,8 @@ import '../../../core/theme/app_colors.dart';
 import '../../../core/widgets/app_logo.dart';
 import '../../../core/widgets/buttons.dart';
 import '../../../core/widgets/state_views.dart';
+import '../../../core/utils/app_exception.dart';
+import '../../ads/rewarded_likes.dart';
 import '../../profile/domain/profile_models.dart';
 import '../../profile/presentation/profile_detail_screen.dart';
 import '../application/discovery_controller.dart';
@@ -36,7 +38,13 @@ class _DiscoverScreenState extends ConsumerState<DiscoverScreen> {
         await celebrateMatch(context, ref, result, card);
       }
     } catch (e) {
-      if (mounted) showSnack(context, e);
+      if (!mounted) return;
+      final error = AppException.from(e);
+      if (error.code == 'rate_limited' && error.message.toLowerCase().contains('out of likes')) {
+        await offerRewardedLikes(context, ref);
+      } else {
+        showSnack(context, error.message, isError: true);
+      }
     }
   }
 

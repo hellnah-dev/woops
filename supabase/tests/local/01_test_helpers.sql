@@ -1,10 +1,10 @@
 -- Tiny assertion helpers for the security tests (test database only).
 create schema tests;
-grant usage on schema tests to anon, authenticated;
+grant usage on schema tests to anon, authenticated, service_role;
 
 create table tests.results (id serial primary key, name text, passed boolean, detail text);
-grant insert, select on tests.results to anon, authenticated;
-grant usage on sequence tests.results_id_seq to anon, authenticated;
+grant insert, select on tests.results to anon, authenticated, service_role;
+grant usage on sequence tests.results_id_seq to anon, authenticated, service_role;
 
 create function tests.ok(p_cond boolean, p_name text) returns void language plpgsql as $$
 begin
@@ -31,4 +31,4 @@ create function tests.login(p_user uuid) returns void language sql as $$
   select set_config('request.jwt.claim.sub', coalesce(p_user::text, ''), false);
 $$;
 
-grant execute on all functions in schema tests to anon, authenticated;
+grant execute on all functions in schema tests to anon, authenticated, service_role;

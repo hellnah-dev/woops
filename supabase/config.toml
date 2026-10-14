@@ -32,3 +32,11 @@ verify_jwt = true
 # Called by Database Webhooks, authenticated by the x-webhook-secret header.
 [functions.push-notify]
 verify_jwt = false
+
+# Called by Google (AdMob server-side verification); authenticated by Google's signature.
+[functions.admob-ssv]
+verify_jwt = false
+
+# Called by Database Webhooks, authenticated by the x-webhook-secret header.
+[functions.admin-alerts]
+verify_jwt = false

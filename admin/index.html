@@ -1,0 +1,52 @@
+<!doctype html>
+<html lang="en">
+<head>
+  <meta charset="utf-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1">
+  <meta name="robots" content="noindex, nofollow">
+  <!-- Only our own files, the pinned Supabase library, and your Supabase project. -->
+  <meta http-equiv="Content-Security-Policy"
+        content="default-src 'self'; script-src 'self' https://cdn.jsdelivr.net; style-src 'self' 'unsafe-inline';
+                 img-src 'self' data: blob: https://*.supabase.co; connect-src 'self' https://*.supabase.co wss://*.supabase.co;
+                 frame-ancestors 'none'; base-uri 'none'; form-action 'none'">
+  <title>Woops Admin</title>
+  <link rel="stylesheet" href="css/admin.css">
+</head>
+<body>
+  <div id="login" class="login hidden">
+    <form id="login-form" class="card login-card">
+      <div class="brand"><span class="logo">W</span> Woops Admin</div>
+      <p class="muted">Sign in with an account listed in the <code>admins</code> table.</p>
+      <label>Email <input id="login-email" type="email" autocomplete="username" required></label>
+      <label>Password <input id="login-password" type="password" autocomplete="current-password" required></label>
+      <button class="btn primary" type="submit">Sign in</button>
+      <p id="login-error" class="error"></p>
+    </form>
+  </div>
+
+  <div id="app" class="layout hidden">
+    <aside class="sidebar">
+      <div class="brand"><span class="logo">W</span> Woops Admin</div>
+      <nav id="nav">
+        <a href="#/dashboard" data-route="dashboard">📊 Dashboard</a>
+        <a href="#/reports" data-route="reports">🚩 Reports <span class="badge" id="badge-reports"></span></a>
+        <a href="#/verifications" data-route="verifications">✅ Verifications <span class="badge" id="badge-verifications"></span></a>
+        <a href="#/users" data-route="users">👥 Users</a>
+        <a href="#/photos" data-route="photos">🖼️ Photo review</a>
+        <a href="#/errors" data-route="errors">🐞 App errors <span class="badge" id="badge-errors"></span></a>
+        <a href="#/age-rules" data-route="age-rules">🎂 Age rules</a>
+        <a href="#/audit" data-route="audit">📜 Audit log</a>
+      </nav>
+      <div class="sidebar-footer">
+        <button id="enable-notifications" class="btn small">🔔 Enable alerts</button>
+        <div id="whoami" class="muted small"></div>
+        <button id="logout" class="btn small">Sign out</button>
+      </div>
+    </aside>
+    <main id="view" class="main"></main>
+  </div>
+
+  <div id="toasts" class="toasts" aria-live="polite"></div>
+  <script type="module" src="js/main.js"></script>
+</body>
+</html>

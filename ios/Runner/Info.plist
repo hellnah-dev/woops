@@ -39,6 +39,8 @@
 	<string>$(FLUTTER_BUILD_NUMBER)</string>
 	<key>FirebaseAppDelegateProxyEnabled</key>
 	<true/>
+	<key>GADApplicationIdentifier</key>
+	<string>$(ADMOB_APP_ID_IOS)</string>
 	<key>LSApplicationQueriesSchemes</key>
 	<array>
 		<string>https</string>
@@ -52,6 +54,15 @@
 	<string>Woops uses your approximate location to show people near you. Your exact location is never shared.</string>
 	<key>NSPhotoLibraryUsageDescription</key>
 	<string>Woops needs access to your photos so you can add them to your profile.</string>
+	<key>NSUserTrackingUsageDescription</key>
+	<string>Woops uses this to show you more relevant ads. You can say no and still use every feature.</string>
+	<key>SKAdNetworkItems</key>
+	<array>
+		<dict>
+			<key>SKAdNetworkIdentifier</key>
+			<string>cstr6suwn9.skadnetwork</string>
+		</dict>
+	</array>
 	<key>UIApplicationSceneManifest</key>
 	<dict>
 		<key>UIApplicationSupportsMultipleScenes</key>

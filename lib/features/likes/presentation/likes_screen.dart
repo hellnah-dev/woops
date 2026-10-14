@@ -6,6 +6,7 @@ import '../../../core/router/app_router.dart';
 import '../../../core/theme/app_colors.dart';
 import '../../../core/widgets/profile_photo.dart';
 import '../../../core/widgets/state_views.dart';
+import '../../ads/ad_widgets.dart';
 import '../../discovery/application/discovery_controller.dart';
 import '../../discovery/data/discovery_repository.dart';
 import '../../discovery/presentation/match_flow.dart';
@@ -36,6 +37,7 @@ class LikesScreen extends ConsumerWidget {
     final likes = ref.watch(likesReceivedProvider);
     return Scaffold(
       appBar: AppBar(title: const Text('Likes')),
+      bottomNavigationBar: const BannerAdSlot(),
       body: likes.when(
         loading: () => const LoadingView(),
         error: (e, _) => ErrorView(error: e, onRetry: () => ref.invalidate(likesReceivedProvider)),

@@ -46,6 +46,8 @@ lib/
              safety, settings, notifications
 supabase/
   migrations/                   001 schema · 002 functions · 003 security · 004 storage+realtime · 005 interests
+                                006 country/legal/age · 007 admin/moderation · 008 usernames+ban hashes
+                                009 ad rewards · 010 admin storage
   functions/                    delete-account, push-notify (Deno)
   tests/local/                  run.sh: migrations + 71 multi-account security tests
 test/                           unit + widget tests (fake repositories)
@@ -115,3 +117,19 @@ Other people's profiles are only reachable through:
 | 4 Integration: all screens wired to Supabase, uploads, realtime, push | ✅ code complete; push needs Firebase credentials |
 | 5 Safety: block, report, delete account, privacy controls | ✅ · Premium: ⏳ not started (by design) |
 | 6 Testing & release: unit/widget tests, Android build, release docs | ✅ · iOS build needs Xcode on your Mac |
+
+## Additions (v2)
+
+| Area | Design |
+|---|---|
+| Worldwide | `profiles.country_code` (ISO 3166-1), `discovery_preferences.country_codes`, `max_distance_km = 20000` means "Anywhere"; the distance pre-filter handles the 180° meridian. The app shows km or miles by region, formats dates by locale, and supports RTL. |
+| Age assurance | `country_age_rules` (floor 18, enforced by trigger and RPC); sign-up age gate stores the birthdate and country in auth metadata; the profile birthdate must match; two or more distinct "underage" reports auto-suspend. |
+| Consent | `legal_acceptances` (terms, privacy, guidelines, age_18, versioned); `complete_onboarding()` requires the current version. |
+| Verification | `verification_requests` + private `verification-selfies` bucket (only admins can read). Admins approve, which sets `profiles.is_verified` (not client-writable). |
+| Usernames & bans | Unique `profiles.username` (B-tree unique index: exact, no false positives). `banned_identifiers` stores SHA-256 hashes (built-in `sha256()`) of banned emails and usernames. |
+| Admin | `admins`, `admin_actions` (audit), `admin_*` RPCs that all call `private.require_admin()`. Realtime on reports, verifications and errors (RLS: admins only). Static web panel in `admin/`. |
+| Errors | `app_errors` via `log_client_error()` (anon allowed, size- and rate-limited, grouped by fingerprint). |
+| Photos | WebP (JPEG fallback), ≤1280 px and ≤350 KB, plus a 400 px `_thumb` file; EXIF/GPS always stripped; never uploads an unprocessed original. |
+| Ads | AdMob banner and native (labelled "Sponsored") and rewarded. Consent via UMP + ATT. Rewards go only through `admob-ssv` (verifies Google's ECDSA signature) → `grant_ad_reward()` (service_role only), idempotent per transaction, max 3 a day. |
+
+**Why no Bloom filter for usernames:** a Bloom filter can report false positives (it would say a free name is taken), so uniqueness still needs the exact unique index, which already answers in O(log n). Shipping a filter of all usernames to the app would also leak them. A Bloom filter fits a different job: at very large scale, the "already swiped" exclusion in the discovery feed (`not exists swipes`) can be replaced by a per-user Bloom filter, using a prebuilt library or Postgres's built-in `bloom` index extension.

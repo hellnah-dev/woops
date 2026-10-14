@@ -437,6 +437,28 @@ select tests.ok(not public.is_username_available('KIM99'), 'banned username cann
 reset role;
 
 -- -----------------------------------------------------------------------------
+-- Rewarded ads: only the server can grant extra likes
+-- -----------------------------------------------------------------------------
+set role authenticated;
+select tests.login(:A);
+select tests.ok((public.get_like_allowance() ->> 'limit')::int = 100, 'base daily like limit is 100');
+select tests.throws($q$select public.grant_ad_reward('tx-fake', 'aaaaaaaa-0000-0000-0000-000000000001', 50, 'x')$q$,
+                    '%permission denied%', 'users cannot grant themselves ad rewards');
+select tests.throws($q$insert into public.ad_rewards (transaction_id, user_id, reward_likes) values ('t', 'aaaaaaaa-0000-0000-0000-000000000001', 50)$q$,
+                    '%permission denied%', 'users cannot insert ad rewards directly');
+set role service_role;
+select tests.ok(public.grant_ad_reward('tx-1', :A, 10, 'unit') = 'granted', 'verified reward is granted');
+select tests.ok(public.grant_ad_reward('tx-1', :A, 10, 'unit') = 'duplicate', 'same Google transaction is never granted twice');
+select public.grant_ad_reward('tx-2', :A, 10, 'unit');
+select public.grant_ad_reward('tx-3', :A, 10, 'unit');
+select tests.ok(public.grant_ad_reward('tx-4', :A, 10, 'unit') = 'daily_cap', 'rewarded ads are capped per day');
+set role authenticated;
+select tests.login(:A);
+select tests.ok((public.get_like_allowance() ->> 'limit')::int = 130, 'rewards raise the daily like limit');
+select tests.ok((public.get_like_allowance() ->> 'rewarded_ads_left')::int = 0, 'allowance reports no ads left');
+reset role;
+
+-- -----------------------------------------------------------------------------
 -- Report
 -- -----------------------------------------------------------------------------
 \echo

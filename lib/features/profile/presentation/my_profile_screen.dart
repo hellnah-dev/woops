@@ -7,6 +7,7 @@ import '../../../core/theme/app_colors.dart';
 import '../../../core/utils/validators.dart';
 import '../../../core/widgets/profile_photo.dart';
 import '../../../core/widgets/state_views.dart';
+import '../../ads/ad_widgets.dart';
 import '../application/profile_providers.dart';
 
 class MyProfileScreen extends ConsumerWidget {
@@ -142,6 +143,8 @@ class MyProfileScreen extends ConsumerWidget {
                     ],
                   ),
                 ),
+                const SizedBox(height: AppSpacing.md),
+                const NativeAdCard(),
               ],
             ),
           );

@@ -8,6 +8,7 @@ import '../../../core/router/app_router.dart';
 import '../../../core/supabase/supabase_providers.dart';
 import '../../../core/theme/app_colors.dart';
 import '../../../core/widgets/state_views.dart';
+import '../../ads/ads_service.dart';
 import '../../auth/data/auth_repository.dart';
 import '../../discovery/application/discovery_controller.dart';
 import '../../discovery/presentation/filters_sheet.dart';
@@ -92,6 +93,17 @@ class SettingsScreen extends ConsumerWidget {
             leading: const Icon(Icons.block_rounded),
             title: const Text('Blocked people'),
             onTap: () => context.push(Routes.blockedUsers),
+          ),
+          FutureBuilder<bool>(
+            future: AdsController.privacyOptionsRequired(),
+            builder: (context, snap) => snap.data == true
+                ? ListTile(
+                    leading: const Icon(Icons.ads_click_rounded),
+                    title: const Text('Ad privacy choices'),
+                    subtitle: const Text('Change how ads use your data'),
+                    onTap: AdsController.showPrivacyOptions,
+                  )
+                : const SizedBox.shrink(),
           ),
           if (email != null)
             ListTile(leading: const Icon(Icons.alternate_email_rounded), title: const Text('Email'), subtitle: Text(email)),

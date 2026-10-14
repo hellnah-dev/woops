@@ -2,6 +2,7 @@ import 'package:flutter/material.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
 import 'package:go_router/go_router.dart';
 
+import '../../features/ads/ads_service.dart';
 import '../../features/chat/application/chat_controllers.dart';
 import '../../features/notifications/push_service.dart';
 import '../../features/profile/data/profile_repository.dart';
@@ -20,9 +21,11 @@ class _HomeShellState extends ConsumerState<HomeShell> with WidgetsBindingObserv
   void initState() {
     super.initState();
     WidgetsBinding.instance.addObserver(this);
-    WidgetsBinding.instance.addPostFrameCallback((_) {
+    WidgetsBinding.instance.addPostFrameCallback((_) async {
       _touch();
-      ref.read(pushServiceProvider).registerForCurrentUser(context);
+      // One prompt at a time: notifications first, then ad consent.
+      await ref.read(pushServiceProvider).registerForCurrentUser(context);
+      if (mounted) await ref.read(adsReadyProvider.notifier).start();
     });
   }
 

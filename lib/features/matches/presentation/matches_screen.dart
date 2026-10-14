@@ -7,6 +7,7 @@ import '../../../core/theme/app_colors.dart';
 import '../../../core/utils/time_format.dart';
 import '../../../core/widgets/profile_photo.dart';
 import '../../../core/widgets/state_views.dart';
+import '../../ads/ad_widgets.dart';
 import '../../chat/application/chat_controllers.dart';
 import '../../chat/domain/chat_models.dart';
 
@@ -31,6 +32,7 @@ class MatchesScreen extends ConsumerWidget {
     final inbox = ref.watch(inboxProvider);
     return Scaffold(
       appBar: AppBar(title: const Text('Matches')),
+      bottomNavigationBar: const BannerAdSlot(),
       body: inbox.when(
         loading: () => const LoadingView(),
         error: (e, _) => ErrorView(error: e, onRetry: () => ref.invalidate(inboxProvider)),
