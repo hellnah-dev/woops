@@ -169,7 +169,7 @@ Fill in the Data safety form (location, photos, messages, account deletion) and 
 | Premium / RevenueCat | ⏳ **not implemented.** The server-side entitlement check exists (premium lifts the daily like limit), but there is no purchase flow or RevenueCat webhook yet |
 
 ### Known limitations
-- The iOS build has not been compiled on the development machine (Xcode wasn't installed there). Run `pod install` and build on a Mac with Xcode.
+- **Native builds not yet verified:** `flutter analyze` and all tests pass, but the Android APK build could not finish on the development machine (the Gradle download stalled on a slow connection), and iOS could not be built there (Xcode wasn't installed). Your first `flutter run` on an emulator is the first native compile, so report any build errors.
 - Edge Functions were not type-checked with Deno locally. Deploy them and check the function logs in the dashboard.
 - Image messages: the schema supports them (`kind`, `media_path`), but the app sends text only.
 - There is no admin moderation dashboard yet. Review the `reports` table in the Supabase Table Editor and set `profiles.status` to `suspended`/`banned` to take action.
