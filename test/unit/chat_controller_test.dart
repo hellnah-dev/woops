@@ -13,10 +13,9 @@ void main() {
   late ProviderContainer container;
 
   Future<ChatController> start() async {
-    container = ProviderContainer(overrides: [
-      chatRepositoryProvider.overrideWithValue(repo),
-      currentUserIdProvider.overrideWithValue('me'),
-    ]);
+    container = ProviderContainer(
+      overrides: [chatRepositoryProvider.overrideWithValue(repo), currentUserIdProvider.overrideWithValue('me')],
+    );
     addTearDown(container.dispose);
     container.listen(chatControllerProvider(args), (_, _) {});
     await pumpEventQueue();
@@ -27,8 +26,7 @@ void main() {
 
   test('loads history newest-first and marks the conversation read', () async {
     final t = DateTime.utc(2026, 10, 14);
-    repo = FakeChatRepository()
-      ..history = [msg('1', at: t), msg('2', at: t.add(const Duration(minutes: 1)))];
+    repo = FakeChatRepository()..history = [msg('1', at: t), msg('2', at: t.add(const Duration(minutes: 1)))];
     await start();
     expect(state().messages.map((m) => m.id), ['2', '1']);
     await Future<void>.delayed(const Duration(milliseconds: 700));

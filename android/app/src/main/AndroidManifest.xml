@@ -3,6 +3,9 @@
     <!-- Approximate location only: we never need precise coordinates. -->
     <uses-permission android:name="android.permission.ACCESS_COARSE_LOCATION" />
     <uses-permission android:name="android.permission.POST_NOTIFICATIONS" />
+    <!-- Profile photos and verification selfies -->
+    <uses-permission android:name="android.permission.CAMERA" />
+    <uses-feature android:name="android.hardware.camera" android:required="false" />
 
     <application
         android:label="Woops"
@@ -38,6 +41,11 @@
                 <data android:scheme="com.woops.app" android:host="login-callback" />
             </intent-filter>
         </activity>
+        <!-- Photo cropping screen (image_cropper) -->
+        <activity
+            android:name="com.yalantis.ucrop.UCropActivity"
+            android:screenOrientation="portrait"
+            android:theme="@style/Theme.AppCompat.Light.NoActionBar" />
         <!-- Don't delete the meta-data below.
              This is used by the Flutter tool to generate GeneratedPluginRegistrant.java -->
         <meta-data

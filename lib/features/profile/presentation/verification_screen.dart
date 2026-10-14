@@ -2,6 +2,7 @@ import 'package:flutter/material.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
 import 'package:image_picker/image_picker.dart';
 
+import '../../../core/permissions/permission_gate.dart';
 import '../../../core/theme/app_colors.dart';
 import '../../../core/widgets/buttons.dart';
 import '../../../core/widgets/state_views.dart';
@@ -26,6 +27,7 @@ class _VerificationScreenState extends ConsumerState<VerificationScreen> {
   bool _uploading = false;
 
   Future<void> _takeSelfie() async {
+    if (!await PermissionGate.request(context, AppPermission.camera) || !mounted) return;
     final XFile? selfie;
     try {
       selfie = await ImagePicker().pickImage(
@@ -35,7 +37,9 @@ class _VerificationScreenState extends ConsumerState<VerificationScreen> {
         imageQuality: 90,
       );
     } catch (_) {
-      if (mounted) showSnack(context, 'Couldn’t open the camera. Check Woops’s camera permission in Settings.', isError: true);
+      if (mounted) {
+        showSnack(context, 'Couldn’t open the camera. Check Woops’s camera permission in Settings.', isError: true);
+      }
       return;
     }
     if (selfie == null) return;
@@ -111,11 +115,17 @@ class _VerificationScreenState extends ConsumerState<VerificationScreen> {
                     children: [
                       const Text('✌️', style: TextStyle(fontSize: 72)),
                       const SizedBox(height: AppSpacing.sm),
-                      Text('Hold up a peace sign next to your face', style: theme.textTheme.titleMedium,
-                          textAlign: TextAlign.center),
+                      Text(
+                        'Hold up a peace sign next to your face',
+                        style: theme.textTheme.titleMedium,
+                        textAlign: TextAlign.center,
+                      ),
                       const SizedBox(height: 4),
-                      Text('Good light, face clearly visible, no filters or sunglasses.',
-                          style: theme.textTheme.bodyMedium, textAlign: TextAlign.center),
+                      Text(
+                        'Good light, face clearly visible, no filters or sunglasses.',
+                        style: theme.textTheme.bodyMedium,
+                        textAlign: TextAlign.center,
+                      ),
                     ],
                   ),
                 ),

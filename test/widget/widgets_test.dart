@@ -12,9 +12,9 @@ import 'package:flutter_test/flutter_test.dart';
 import '../helpers/fakes.dart';
 
 Widget _app(Widget child, {List<Override> overrides = const []}) => ProviderScope(
-      overrides: overrides,
-      child: MaterialApp(theme: AppTheme.light, home: child),
-    );
+  overrides: overrides,
+  child: MaterialApp(theme: AppTheme.light, home: child),
+);
 
 void main() {
   testWidgets('AppLogo shows a placeholder until assets/branding/logo.png exists', (tester) async {
@@ -36,8 +36,14 @@ void main() {
     expect(find.text('Please accept to continue'), findsNWidgets(2));
 
     await tester.enterText(find.byKey(const Key('signup-email')), 'asha@example.com');
-    await tester.enterText(find.descendant(of: find.byKey(const Key('signup-password')), matching: find.byType(TextFormField)), 'goodpass1');
-    await tester.enterText(find.descendant(of: find.byKey(const Key('signup-confirm')), matching: find.byType(TextFormField)), 'different1');
+    await tester.enterText(
+      find.descendant(of: find.byKey(const Key('signup-password')), matching: find.byType(TextFormField)),
+      'goodpass1',
+    );
+    await tester.enterText(
+      find.descendant(of: find.byKey(const Key('signup-confirm')), matching: find.byType(TextFormField)),
+      'different1',
+    );
     await tester.ensureVisible(find.text('Create account'));
     await tester.tap(find.text('Create account'));
     await tester.pump();
@@ -46,13 +52,20 @@ void main() {
 
   testWidgets('Swipeable card: dragging right past the threshold likes', (tester) async {
     SwipeAction? result;
-    await tester.pumpWidget(_app(Scaffold(
-      body: SizedBox(
-        width: 400,
-        height: 600,
-        child: SwipeableCard(onSwiped: (a) => result = a, child: const ColoredBox(color: Colors.pink)),
+    await tester.pumpWidget(
+      _app(
+        Scaffold(
+          body: SizedBox(
+            width: 400,
+            height: 600,
+            child: SwipeableCard(
+              onSwiped: (a) => result = a,
+              child: const ColoredBox(color: Colors.pink),
+            ),
+          ),
+        ),
       ),
-    )));
+    );
     await tester.drag(find.byType(SwipeableCard), const Offset(300, 0));
     await tester.pumpAndSettle();
     expect(result, SwipeAction.like);
@@ -60,9 +73,16 @@ void main() {
 
   testWidgets('Swipeable card: a short drag springs back without swiping', (tester) async {
     SwipeAction? result;
-    await tester.pumpWidget(_app(Scaffold(
-      body: SwipeableCard(onSwiped: (a) => result = a, child: const ColoredBox(color: Colors.pink)),
-    )));
+    await tester.pumpWidget(
+      _app(
+        Scaffold(
+          body: SwipeableCard(
+            onSwiped: (a) => result = a,
+            child: const ColoredBox(color: Colors.pink),
+          ),
+        ),
+      ),
+    );
     await tester.timedDrag(find.byType(SwipeableCard), const Offset(-40, 0), const Duration(milliseconds: 600));
     await tester.pumpAndSettle();
     expect(result, isNull);
@@ -72,13 +92,12 @@ void main() {
     final repo = FakeDiscoveryRepository([
       [card('a', name: 'Asha'), card('b', name: 'Bina')],
     ]);
-    await tester.pumpWidget(_app(
-      const DiscoverScreen(),
-      overrides: [
-        discoveryRepositoryProvider.overrideWithValue(repo),
-        currentUserIdProvider.overrideWithValue('me'),
-      ],
-    ));
+    await tester.pumpWidget(
+      _app(
+        const DiscoverScreen(),
+        overrides: [discoveryRepositoryProvider.overrideWithValue(repo), currentUserIdProvider.overrideWithValue('me')],
+      ),
+    );
     await tester.pumpAndSettle();
     expect(find.text('Asha  27', findRichText: true), findsWidgets);
 
@@ -90,13 +109,12 @@ void main() {
 
   testWidgets('Discover shows a helpful empty state', (tester) async {
     final repo = FakeDiscoveryRepository([const []]);
-    await tester.pumpWidget(_app(
-      const DiscoverScreen(),
-      overrides: [
-        discoveryRepositoryProvider.overrideWithValue(repo),
-        currentUserIdProvider.overrideWithValue('me'),
-      ],
-    ));
+    await tester.pumpWidget(
+      _app(
+        const DiscoverScreen(),
+        overrides: [discoveryRepositoryProvider.overrideWithValue(repo), currentUserIdProvider.overrideWithValue('me')],
+      ),
+    );
     await tester.pumpAndSettle();
     expect(find.text('You’ve seen everyone for now'), findsOneWidget);
     expect(find.text('Adjust filters'), findsOneWidget);

@@ -55,10 +55,10 @@ class ProfilePhoto extends ConsumerWidget {
         errorWidget: (context, url, error) => thumbnail
             ? ProfilePhoto(storagePath: path, fit: fit, memCacheWidth: memCacheWidth)
             : Container(
-          color: scheme.surfaceContainerHighest,
-          alignment: Alignment.center,
-          child: Icon(Icons.broken_image_outlined, color: scheme.onSurfaceVariant),
-        ),
+                color: scheme.surfaceContainerHighest,
+                alignment: Alignment.center,
+                child: Icon(Icons.broken_image_outlined, color: scheme.onSurfaceVariant),
+              ),
       );
     }
 

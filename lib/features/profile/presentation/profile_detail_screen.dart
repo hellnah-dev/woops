@@ -1,6 +1,7 @@
 import 'package:flutter/material.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
 
+import '../../../core/astro/zodiac.dart';
 import '../../../core/i18n/countries.dart';
 import '../../../core/i18n/units.dart';
 import '../../../core/theme/app_colors.dart';
@@ -122,69 +123,93 @@ class _Body extends ConsumerWidget {
                   AppSpacing.lg,
                   actions == ProfileDetailActions.swipe ? 120 : AppSpacing.xl,
                 ),
-                sliver: SliverList.list(children: [
-                  Text.rich(
-                    TextSpan(children: [
-                      TextSpan(text: card.displayName),
-                      TextSpan(text: ', ${card.age}', style: const TextStyle(fontWeight: FontWeight.w400)),
-                      if (card.isVerified)
-                        const WidgetSpan(
-                          alignment: PlaceholderAlignment.middle,
-                          child: Padding(
-                            padding: EdgeInsets.only(left: 8),
-                            child: Tooltip(
-                              message: 'Photo verified',
-                              child: Icon(Icons.verified_rounded, color: Colors.blue, size: 26),
-                            ),
+                sliver: SliverList.list(
+                  children: [
+                    Text.rich(
+                      TextSpan(
+                        children: [
+                          TextSpan(text: card.displayName),
+                          TextSpan(
+                            text: ', ${card.age}',
+                            style: const TextStyle(fontWeight: FontWeight.w400),
                           ),
-                        ),
-                    ]),
-                    style: theme.textTheme.headlineMedium,
-                  ),
-                  if (card.username != null)
-                    Text('@${card.username}',
-                        style: theme.textTheme.bodyLarge?.copyWith(color: theme.colorScheme.onSurfaceVariant)),
-                  const SizedBox(height: AppSpacing.sm),
-                  Wrap(
-                    spacing: 16,
-                    runSpacing: 8,
-                    children: [
-                      _Fact(icon: Icons.person_outline_rounded, text: card.gender.label),
-                      if ((card.jobTitle ?? '').isNotEmpty) _Fact(icon: Icons.work_outline_rounded, text: card.jobTitle!),
-                      if ((card.city ?? '').isNotEmpty || countryByCode(card.countryCode) != null)
-                        _Fact(
-                          icon: Icons.location_city_rounded,
-                          text: [
-                            if ((card.city ?? '').isNotEmpty) card.city!,
-                            if (countryByCode(card.countryCode) case final c?) '${c.flag} ${c.name}',
-                          ].join(', '),
-                        ),
-                      if (card.distanceKm != null)
-                        _Fact(icon: Icons.near_me_outlined, text: DistanceUnits.away(card.distanceKm!)),
-                    ],
-                  ),
-                  const SizedBox(height: AppSpacing.lg),
-                  _Section(
-                    title: 'Looking for',
-                    child: Text('${card.intention.emoji}  ${card.intention.label}', style: theme.textTheme.titleMedium),
-                  ),
-                  if (card.bio.isNotEmpty)
-                    _Section(title: 'About', child: Text(card.bio, style: theme.textTheme.bodyLarge?.copyWith(height: 1.45))),
-                  for (final p in card.prompts)
-                    _Section(
-                      title: p.prompt,
-                      child: Text(p.answer, style: theme.textTheme.titleLarge?.copyWith(fontWeight: FontWeight.w600)),
+                          if (card.isVerified)
+                            const WidgetSpan(
+                              alignment: PlaceholderAlignment.middle,
+                              child: Padding(
+                                padding: EdgeInsets.only(left: 8),
+                                child: Tooltip(
+                                  message: 'Photo verified',
+                                  child: Icon(Icons.verified_rounded, color: Colors.blue, size: 26),
+                                ),
+                              ),
+                            ),
+                        ],
+                      ),
+                      style: theme.textTheme.headlineMedium,
                     ),
-                  if (card.interests.isNotEmpty)
+                    if (card.username != null)
+                      Text(
+                        '@${card.username}',
+                        style: theme.textTheme.bodyLarge?.copyWith(color: theme.colorScheme.onSurfaceVariant),
+                      ),
+                    const SizedBox(height: AppSpacing.sm),
+                    Wrap(
+                      spacing: 16,
+                      runSpacing: 8,
+                      children: [
+                        _Fact(icon: Icons.person_outline_rounded, text: card.gender.label),
+                        if ((card.jobTitle ?? '').isNotEmpty)
+                          _Fact(icon: Icons.work_outline_rounded, text: card.jobTitle!),
+                        if ((card.city ?? '').isNotEmpty || countryByCode(card.countryCode) != null)
+                          _Fact(
+                            icon: Icons.location_city_rounded,
+                            text: [
+                              if ((card.city ?? '').isNotEmpty) card.city!,
+                              if (countryByCode(card.countryCode) case final c?) '${c.flag} ${c.name}',
+                            ].join(', '),
+                          ),
+                        if (card.distanceKm != null)
+                          _Fact(icon: Icons.near_me_outlined, text: DistanceUnits.away(card.distanceKm!)),
+                      ],
+                    ),
+                    const SizedBox(height: AppSpacing.lg),
                     _Section(
-                      title: 'Interests',
-                      child: Wrap(
-                        spacing: 8,
-                        runSpacing: 8,
-                        children: [for (final i in card.interests) Chip(label: Text(i))],
+                      title: 'Looking for',
+                      child: Text(
+                        '${card.intention.emoji}  ${card.intention.label}',
+                        style: theme.textTheme.titleMedium,
                       ),
                     ),
-                ]),
+                    if (card.bio.isNotEmpty)
+                      _Section(
+                        title: 'About',
+                        child: Text(card.bio, style: theme.textTheme.bodyLarge?.copyWith(height: 1.45)),
+                      ),
+                    for (final p in card.prompts)
+                      _Section(
+                        title: p.prompt,
+                        child: Text(p.answer, style: theme.textTheme.titleLarge?.copyWith(fontWeight: FontWeight.w600)),
+                      ),
+                    if (card.zodiac case final sign?)
+                      _Section(
+                        title: 'Astrology',
+                        child: _ZodiacBlock(
+                          sign: sign,
+                          mine: isMe ? null : ref.watch(myProfileProvider).valueOrNull?.zodiac,
+                        ),
+                      ),
+                    if (card.interests.isNotEmpty)
+                      _Section(
+                        title: 'Interests',
+                        child: Wrap(
+                          spacing: 8,
+                          runSpacing: 8,
+                          children: [for (final i in card.interests) Chip(label: Text(i))],
+                        ),
+                      ),
+                  ],
+                ),
               ),
             ],
           ),
@@ -218,6 +243,62 @@ class _Body extends ConsumerWidget {
             ),
         ],
       ),
+    );
+  }
+}
+
+class _ZodiacBlock extends StatelessWidget {
+  const _ZodiacBlock({required this.sign, this.mine});
+  final ZodiacSign sign;
+  final ZodiacSign? mine;
+
+  @override
+  Widget build(BuildContext context) {
+    final theme = Theme.of(context);
+    final match = mine == null ? null : zodiacCompatibility(mine!, sign);
+    return Column(
+      crossAxisAlignment: CrossAxisAlignment.start,
+      children: [
+        Row(
+          children: [
+            Text(sign.symbol, style: const TextStyle(fontSize: 34)),
+            const SizedBox(width: 12),
+            Expanded(
+              child: Column(
+                crossAxisAlignment: CrossAxisAlignment.start,
+                children: [
+                  Text(sign.label, style: theme.textTheme.titleLarge),
+                  Text('${sign.elementLabel} · ${sign.dates}', style: theme.textTheme.bodySmall),
+                ],
+              ),
+            ),
+          ],
+        ),
+        if (match != null) ...[
+          const SizedBox(height: 12),
+          Container(
+            width: double.infinity,
+            padding: const EdgeInsets.all(12),
+            decoration: BoxDecoration(
+              color: theme.colorScheme.primary.withValues(alpha: 0.08),
+              borderRadius: BorderRadius.circular(AppRadius.md),
+            ),
+            child: Column(
+              crossAxisAlignment: CrossAxisAlignment.start,
+              children: [
+                Text(
+                  '${'💖' * match.hearts}  ${mine!.symbol} + ${sign.symbol}  ${match.title}',
+                  style: theme.textTheme.titleMedium,
+                ),
+                const SizedBox(height: 2),
+                Text(match.text, style: theme.textTheme.bodyMedium),
+                const SizedBox(height: 4),
+                Text('Just for fun ✨', style: theme.textTheme.bodySmall),
+              ],
+            ),
+          ),
+        ],
+      ],
     );
   }
 }

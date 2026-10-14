@@ -40,8 +40,10 @@ Future<void> offerRewardedLikes(BuildContext context, WidgetRef ref) async {
     builder: (context) => AlertDialog(
       icon: const Icon(Icons.favorite_rounded),
       title: const Text('Out of likes'),
-      content: Text('Watch a short ad to get ${AdsConfig.rewardLikes} more likes today '
-          '(${allowance['rewarded_ads_left']} left today). Or wait: your likes refresh within 24 hours.'),
+      content: Text(
+        'Watch a short ad to get ${AdsConfig.rewardLikes} more likes today '
+        '(${allowance['rewarded_ads_left']} left today). Or wait: your likes refresh within 24 hours.',
+      ),
       actions: [
         TextButton(onPressed: () => Navigator.pop(context, false), child: const Text('Not now')),
         FilledButton(

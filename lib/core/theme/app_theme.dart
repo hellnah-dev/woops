@@ -15,11 +15,12 @@ class AppTheme {
       brightness: brightness,
       primary: AppColors.rose,
       secondary: AppColors.apricot,
-      tertiary: AppColors.violet,
-      surface: isDark ? AppColors.night : Colors.white,
+      tertiary: AppColors.lavender,
+      surface: isDark ? AppColors.plum : AppColors.cream,
+      primaryContainer: isDark ? const Color(0xFF4A1F33) : AppColors.blush,
     );
 
-    final base = ThemeData(useMaterial3: true, colorScheme: scheme, brightness: brightness);
+    final base = ThemeData(useMaterial3: true, colorScheme: scheme, brightness: brightness, fontFamily: AppFonts.body);
     final text = base.textTheme.copyWith(
       displaySmall: base.textTheme.displaySmall?.copyWith(fontWeight: FontWeight.w800, letterSpacing: -0.5),
       headlineMedium: base.textTheme.headlineMedium?.copyWith(fontWeight: FontWeight.w800, letterSpacing: -0.4),
@@ -29,7 +30,7 @@ class AppTheme {
       labelLarge: base.textTheme.labelLarge?.copyWith(fontWeight: FontWeight.w700, letterSpacing: 0.2),
     );
 
-    final fieldFill = isDark ? const Color(0xFF1F1B24) : const Color(0xFFF6F3F5);
+    final fieldFill = isDark ? const Color(0xFF2A1A24) : const Color(0xFFFFEAF1);
 
     return base.copyWith(
       scaffoldBackgroundColor: scheme.surface,
@@ -40,7 +41,7 @@ class AppTheme {
         elevation: 0,
         scrolledUnderElevation: 0.5,
         centerTitle: false,
-        titleTextStyle: text.titleLarge?.copyWith(color: scheme.onSurface),
+        titleTextStyle: text.titleLarge?.copyWith(color: scheme.onSurface, fontWeight: FontWeight.w800),
       ),
       filledButtonTheme: FilledButtonThemeData(
         style: FilledButton.styleFrom(
@@ -64,10 +65,7 @@ class AppTheme {
         filled: true,
         fillColor: fieldFill,
         contentPadding: const EdgeInsets.symmetric(horizontal: 18, vertical: 16),
-        border: OutlineInputBorder(
-          borderRadius: BorderRadius.circular(AppRadius.md),
-          borderSide: BorderSide.none,
-        ),
+        border: OutlineInputBorder(borderRadius: BorderRadius.circular(AppRadius.md), borderSide: BorderSide.none),
         enabledBorder: OutlineInputBorder(
           borderRadius: BorderRadius.circular(AppRadius.md),
           borderSide: BorderSide.none,
@@ -88,30 +86,30 @@ class AppTheme {
         padding: const EdgeInsets.symmetric(horizontal: 10, vertical: 6),
       ),
       cardTheme: CardThemeData(
-        elevation: 0,
-        color: isDark ? const Color(0xFF1C1820) : Colors.white,
+        color: isDark ? const Color(0xFF2A1724) : Colors.white,
+        shadowColor: AppColors.rose.withValues(alpha: 0.18),
+        elevation: isDark ? 0 : 2,
         shape: RoundedRectangleBorder(
           borderRadius: BorderRadius.circular(AppRadius.lg),
-          side: BorderSide(color: scheme.outlineVariant.withValues(alpha: 0.5)),
+          side: BorderSide(color: AppColors.rose.withValues(alpha: isDark ? 0.25 : 0.12)),
         ),
         margin: EdgeInsets.zero,
       ),
-      dialogTheme: DialogThemeData(
-        shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(AppRadius.lg)),
-      ),
+      dialogTheme: DialogThemeData(shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(AppRadius.lg))),
       bottomSheetTheme: const BottomSheetThemeData(
         showDragHandle: true,
         shape: RoundedRectangleBorder(borderRadius: BorderRadius.vertical(top: Radius.circular(AppRadius.lg))),
       ),
       navigationBarTheme: NavigationBarThemeData(
         height: 68,
-        backgroundColor: scheme.surface,
-        indicatorColor: scheme.primary.withValues(alpha: 0.14),
+        backgroundColor: isDark ? const Color(0xFF231420) : Colors.white,
+        indicatorColor: scheme.primary.withValues(alpha: 0.16),
+        shadowColor: AppColors.rose.withValues(alpha: 0.2),
+        elevation: 3,
         labelBehavior: NavigationDestinationLabelBehavior.alwaysShow,
         iconTheme: WidgetStateProperty.resolveWith(
-          (states) => IconThemeData(
-            color: states.contains(WidgetState.selected) ? scheme.primary : scheme.onSurfaceVariant,
-          ),
+          (states) =>
+              IconThemeData(color: states.contains(WidgetState.selected) ? scheme.primary : scheme.onSurfaceVariant),
         ),
       ),
       snackBarTheme: SnackBarThemeData(

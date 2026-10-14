@@ -48,9 +48,7 @@ class _HomeShellState extends ConsumerState<HomeShell> with WidgetsBindingObserv
   @override
   Widget build(BuildContext context) {
     final unread = ref.watch(totalUnreadProvider);
-    final newMatches = ref.watch(inboxProvider.select(
-      (v) => v.valueOrNull?.where((c) => !c.hasMessages).length ?? 0,
-    ));
+    final newMatches = ref.watch(inboxProvider.select((v) => v.valueOrNull?.where((c) => !c.hasMessages).length ?? 0));
 
     return Scaffold(
       body: widget.shell,

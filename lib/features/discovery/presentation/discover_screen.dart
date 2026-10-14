@@ -6,6 +6,7 @@ import '../../../core/router/app_router.dart';
 import '../../../core/theme/app_colors.dart';
 import '../../../core/widgets/app_logo.dart';
 import '../../../core/widgets/buttons.dart';
+import '../../../core/widgets/love_widgets.dart';
 import '../../../core/widgets/state_views.dart';
 import '../../../core/utils/app_exception.dart';
 import '../../ads/rewarded_likes.dart';
@@ -76,7 +77,7 @@ class _DiscoverScreenState extends ConsumerState<DiscoverScreen> {
           children: [
             AppLogo(size: 32),
             SizedBox(width: 10),
-            Text(AppLogo.appName),
+            Wordmark(size: 26, text: AppLogo.appName),
           ],
         ),
         actions: [
@@ -89,90 +90,90 @@ class _DiscoverScreenState extends ConsumerState<DiscoverScreen> {
         ],
       ),
       body: SafeArea(
-        child: Builder(builder: (context) {
-          if (state.queue.isEmpty) {
-            if (state.isLoading) return const LoadingView(message: 'Finding people for you…');
-            if (state.error != null) {
-              return ErrorView(
-                error: state.error!,
-                onRetry: () => ref.read(discoveryControllerProvider.notifier).load(reset: true),
+        child: Builder(
+          builder: (context) {
+            if (state.queue.isEmpty) {
+              if (state.isLoading) return const LoadingView(message: 'Finding people for you…');
+              if (state.error != null) {
+                return ErrorView(
+                  error: state.error!,
+                  onRetry: () => ref.read(discoveryControllerProvider.notifier).load(reset: true),
+                );
+              }
+              return EmptyState(
+                icon: Icons.travel_explore_rounded,
+                title: 'You’ve seen everyone for now',
+                message: 'Check back later, or widen your filters to discover more people.',
+                actionLabel: 'Adjust filters',
+                onAction: () => showFiltersSheet(context),
               );
             }
-            return EmptyState(
-              icon: Icons.travel_explore_rounded,
-              title: 'You’ve seen everyone for now',
-              message: 'Check back later, or widen your filters to discover more people.',
-              actionLabel: 'Adjust filters',
-              onAction: () => showFiltersSheet(context),
-            );
-          }
 
-          final visible = state.queue.take(2).toList();
-          return Column(
-            children: [
-              Expanded(
-                child: Padding(
-                  padding: const EdgeInsets.fromLTRB(AppSpacing.md, AppSpacing.sm, AppSpacing.md, 0),
-                  child: Stack(
+            final visible = state.queue.take(2).toList();
+            return Column(
+              children: [
+                Expanded(
+                  child: Padding(
+                    padding: const EdgeInsets.fromLTRB(AppSpacing.md, AppSpacing.sm, AppSpacing.md, 0),
+                    child: Stack(
+                      children: [
+                        // Render back-to-front so the current card is on top.
+                        for (final card in visible.reversed)
+                          Positioned.fill(
+                            key: ValueKey(card.id),
+                            child: card.id == current!.id
+                                ? SwipeableCard(
+                                    key: _keyFor(card.id),
+                                    onSwiped: (a) => _onSwiped(card, a),
+                                    child: ProfileCardView(card: card, onInfo: () => _openDetails(card)),
+                                  )
+                                : Transform.scale(
+                                    scale: 0.95,
+                                    child: IgnorePointer(child: ProfileCardView(card: card)),
+                                  ),
+                          ),
+                      ],
+                    ),
+                  ),
+                ),
+                Padding(
+                  padding: const EdgeInsets.symmetric(vertical: AppSpacing.md),
+                  child: Row(
+                    mainAxisAlignment: MainAxisAlignment.spaceEvenly,
                     children: [
-                      // Render back-to-front so the current card is on top.
-                      for (final card in visible.reversed)
-                        Positioned.fill(
-                          key: ValueKey(card.id),
-                          child: card.id == current!.id
-                              ? SwipeableCard(
-                                  key: _keyFor(card.id),
-                                  onSwiped: (a) => _onSwiped(card, a),
-                                  child: ProfileCardView(card: card, onInfo: () => _openDetails(card)),
-                                )
-                              : Transform.scale(
-                                  scale: 0.95,
-                                  child: IgnorePointer(child: ProfileCardView(card: card)),
-                                ),
-                        ),
+                      RoundActionButton(
+                        tooltip: 'Undo last pass',
+                        icon: Icons.replay_rounded,
+                        color: AppColors.undo,
+                        size: 52,
+                        onPressed: state.canUndo ? _undo : null,
+                      ),
+                      RoundActionButton(
+                        tooltip: 'Pass',
+                        icon: Icons.close_rounded,
+                        color: AppColors.pass,
+                        size: 68,
+                        onPressed: () => _keyFor(current!.id).currentState?.swipe(SwipeAction.pass),
+                      ),
+                      HeartButton(
+                        tooltip: 'Like',
+                        size: 78,
+                        onPressed: () => _keyFor(current!.id).currentState?.swipe(SwipeAction.like),
+                      ),
+                      RoundActionButton(
+                        tooltip: 'View profile',
+                        icon: Icons.info_outline_rounded,
+                        color: AppColors.violet,
+                        size: 52,
+                        onPressed: () => _openDetails(current!),
+                      ),
                     ],
                   ),
                 ),
-              ),
-              Padding(
-                padding: const EdgeInsets.symmetric(vertical: AppSpacing.md),
-                child: Row(
-                  mainAxisAlignment: MainAxisAlignment.spaceEvenly,
-                  children: [
-                    RoundActionButton(
-                      tooltip: 'Undo last pass',
-                      icon: Icons.replay_rounded,
-                      color: AppColors.undo,
-                      size: 52,
-                      onPressed: state.canUndo ? _undo : null,
-                    ),
-                    RoundActionButton(
-                      tooltip: 'Pass',
-                      icon: Icons.close_rounded,
-                      color: AppColors.pass,
-                      size: 68,
-                      onPressed: () => _keyFor(current!.id).currentState?.swipe(SwipeAction.pass),
-                    ),
-                    RoundActionButton(
-                      tooltip: 'Like',
-                      icon: Icons.favorite_rounded,
-                      color: AppColors.like,
-                      size: 68,
-                      onPressed: () => _keyFor(current!.id).currentState?.swipe(SwipeAction.like),
-                    ),
-                    RoundActionButton(
-                      tooltip: 'View profile',
-                      icon: Icons.info_outline_rounded,
-                      color: AppColors.violet,
-                      size: 52,
-                      onPressed: () => _openDetails(current!),
-                    ),
-                  ],
-                ),
-              ),
-            ],
-          );
-        }),
+              ],
+            );
+          },
+        ),
       ),
     );
   }

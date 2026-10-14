@@ -1,6 +1,7 @@
 import 'package:flutter/material.dart';
 
 import '../theme/app_colors.dart';
+import 'love_widgets.dart';
 
 /// The app logo.
 ///
@@ -34,13 +35,7 @@ class AppLogo extends StatelessWidget {
       children: [
         logo,
         SizedBox(height: size * 0.16),
-        Text(
-          appName,
-          style: Theme.of(context).textTheme.displaySmall?.copyWith(
-                fontSize: size * 0.42,
-                fontWeight: FontWeight.w800,
-              ),
-        ),
+        Wordmark(size: size * 0.42, text: appName),
       ],
     );
   }
@@ -71,7 +66,10 @@ class _Placeholder extends StatelessWidget {
               mainAxisSize: MainAxisSize.min,
               children: [
                 Icon(Icons.image_outlined, color: color),
-                Text('LOGO', style: TextStyle(color: color, fontWeight: FontWeight.w700, letterSpacing: 2)),
+                Text(
+                  'LOGO',
+                  style: TextStyle(color: color, fontWeight: FontWeight.w700, letterSpacing: 2),
+                ),
               ],
             ),
           ),

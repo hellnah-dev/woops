@@ -91,8 +91,8 @@ class _UsernameFieldState extends ConsumerState<UsernameField> {
                 child: SizedBox(width: 18, height: 18, child: CircularProgressIndicator(strokeWidth: 2)),
               )
             : _available == true
-                ? Icon(Icons.check_circle_rounded, color: scheme.primary)
-                : null,
+            ? Icon(Icons.check_circle_rounded, color: scheme.primary)
+            : null,
       ),
     );
   }

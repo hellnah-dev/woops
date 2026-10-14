@@ -21,7 +21,9 @@ class AdsConfig {
   static const rewardLikes = int.fromEnvironment('ADS_REWARD_LIKES', defaultValue: 10);
 
   static bool get supported =>
-      enabled && !kIsWeb && (defaultTargetPlatform == TargetPlatform.android || defaultTargetPlatform == TargetPlatform.iOS);
+      enabled &&
+      !kIsWeb &&
+      (defaultTargetPlatform == TargetPlatform.android || defaultTargetPlatform == TargetPlatform.iOS);
 
   static bool get _android => defaultTargetPlatform == TargetPlatform.android;
   static bool get useTestIds => !kReleaseMode;

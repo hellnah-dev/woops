@@ -41,7 +41,11 @@ class SwipeableCardState extends State<SwipeableCard> with SingleTickerProviderS
 
   double get _width => MediaQuery.sizeOf(context).width;
 
-  Future<void> _animateTo(Offset target, {Duration duration = const Duration(milliseconds: 260), Curve curve = Curves.easeOut}) async {
+  Future<void> _animateTo(
+    Offset target, {
+    Duration duration = const Duration(milliseconds: 260),
+    Curve curve = Curves.easeOut,
+  }) async {
     _animation = Tween(begin: _drag, end: target).animate(CurvedAnimation(parent: _controller, curve: curve));
     _controller.duration = duration;
     await _controller.forward(from: 0);
@@ -86,9 +90,21 @@ class SwipeableCardState extends State<SwipeableCard> with SingleTickerProviderS
             children: [
               widget.child,
               if (progress > 0.05)
-                _Stamp(label: 'LIKE', color: AppColors.like, opacity: progress, alignment: Alignment.topLeft, angle: -0.35),
+                _Stamp(
+                  label: 'LOVE 💖',
+                  color: AppColors.like,
+                  opacity: progress,
+                  alignment: Alignment.topLeft,
+                  angle: -0.35,
+                ),
               if (progress < -0.05)
-                _Stamp(label: 'NOPE', color: AppColors.pass, opacity: -progress, alignment: Alignment.topRight, angle: 0.35),
+                _Stamp(
+                  label: 'NOPE',
+                  color: AppColors.pass,
+                  opacity: -progress,
+                  alignment: Alignment.topRight,
+                  angle: 0.35,
+                ),
             ],
           ),
         ),
@@ -98,7 +114,13 @@ class SwipeableCardState extends State<SwipeableCard> with SingleTickerProviderS
 }
 
 class _Stamp extends StatelessWidget {
-  const _Stamp({required this.label, required this.color, required this.opacity, required this.alignment, required this.angle});
+  const _Stamp({
+    required this.label,
+    required this.color,
+    required this.opacity,
+    required this.alignment,
+    required this.angle,
+  });
 
   final String label;
   final Color color;

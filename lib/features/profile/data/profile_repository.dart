@@ -24,8 +24,10 @@ class ProfileRepository {
   Future<MyProfile?> fetchMyProfile() async {
     final row = await _client
         .from('profiles')
-        .select('*, profile_photos(id, storage_path, position), profile_interests(interest_id), '
-            'profile_prompts(id, prompt, answer, position)')
+        .select(
+          '*, profile_photos(id, storage_path, position), profile_interests(interest_id), '
+          'profile_prompts(id, prompt, answer, position)',
+        )
         .eq('id', _uid)
         .maybeSingle();
     return row == null ? null : MyProfile.fromJson(row);
@@ -46,12 +48,12 @@ class ProfileRepository {
     });
     await _client
         .from('discovery_preferences')
-        .update({'genders': draft.interestedIn.map((g) => g.value).toList()}).eq('user_id', uid);
+        .update({'genders': draft.interestedIn.map((g) => g.value).toList()})
+        .eq('user_id', uid);
     await setInterests(draft.interestIds);
   }
 
-  Future<void> updateProfile(Map<String, dynamic> fields) =>
-      _client.from('profiles').update(fields).eq('id', _uid);
+  Future<void> updateProfile(Map<String, dynamic> fields) => _client.from('profiles').update(fields).eq('id', _uid);
 
   Future<void> setInterests(Set<int> ids) => _client.rpc('set_my_interests', params: {'p_interest_ids': ids.toList()});
 
@@ -102,11 +104,9 @@ class ProfileRepository {
     final uid = _uid;
     final bytes = await _images.processSelfie(await selfie.readAsBytes());
     final path = '$uid/${DateTime.now().microsecondsSinceEpoch}.jpg';
-    await _client.storage.from('verification-selfies').uploadBinary(
-          path,
-          bytes,
-          fileOptions: const FileOptions(contentType: 'image/jpeg', upsert: false),
-        );
+    await _client.storage
+        .from('verification-selfies')
+        .uploadBinary(path, bytes, fileOptions: const FileOptions(contentType: 'image/jpeg', upsert: false));
     await _client.rpc('request_verification', params: {'p_selfie_path': path});
   }
 

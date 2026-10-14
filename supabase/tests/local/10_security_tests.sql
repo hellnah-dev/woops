@@ -459,6 +459,24 @@ select tests.ok((public.get_like_allowance() ->> 'rewarded_ads_left')::int = 0, 
 reset role;
 
 -- -----------------------------------------------------------------------------
+-- Zodiac: shared as a sign only, and can be hidden
+-- -----------------------------------------------------------------------------
+reset role;
+select tests.ok(private.zodiac_sign('2000-03-21') = 'aries' and private.zodiac_sign('2000-12-31') = 'capricorn'
+                and private.zodiac_sign('2000-01-19') = 'capricorn' and private.zodiac_sign('2000-02-19') = 'pisces'
+                and private.zodiac_sign('2000-08-10') = 'leo', 'zodiac signs are computed correctly');
+set role authenticated;
+select tests.login(:G);
+select tests.ok((select zodiac from public.get_discovery_feed(20) where id = :H) is not null, 'feed shows zodiac sign');
+select tests.ok(not exists (select 1 from public.get_discovery_feed(20) f where f::text ~ '\d{4}-\d{2}-\d{2}'),
+                'feed never exposes a birthdate');
+select tests.login(:H);
+update public.privacy_settings set show_zodiac = false;
+select tests.login(:G);
+select tests.ok((select zodiac from public.get_discovery_feed(20) where id = :H) is null, 'hidden zodiac is not shared');
+reset role;
+
+-- -----------------------------------------------------------------------------
 -- Report
 -- -----------------------------------------------------------------------------
 \echo

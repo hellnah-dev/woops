@@ -17,11 +17,11 @@ import '../application/discovery_controller.dart';
 /// Opens the discovery preferences editor. Saves to the server and reloads
 /// the feed when the user taps "Apply".
 Future<void> showFiltersSheet(BuildContext context) => showModalBottomSheet<void>(
-      context: context,
-      isScrollControlled: true,
-      useSafeArea: true,
-      builder: (_) => const FiltersSheet(),
-    );
+  context: context,
+  isScrollControlled: true,
+  useSafeArea: true,
+  builder: (_) => const FiltersSheet(),
+);
 
 class FiltersSheet extends ConsumerStatefulWidget {
   const FiltersSheet({super.key});
@@ -88,7 +88,8 @@ class _FiltersSheetState extends ConsumerState<FiltersSheet> {
                       divisions: 81,
                       values: RangeValues(p.minAge.toDouble(), p.maxAge.toDouble()),
                       labels: RangeLabels('${p.minAge}', '${p.maxAge}'),
-                      onChanged: (v) => setState(() => _prefs = p.copyWith(minAge: v.start.round(), maxAge: v.end.round())),
+                      onChanged: (v) =>
+                          setState(() => _prefs = p.copyWith(minAge: v.start.round(), maxAge: v.end.round())),
                     ),
                     SectionLabel('Maximum distance', trailing: DistanceUnits.limit(p.maxDistanceKm)),
                     Slider(
@@ -108,7 +109,8 @@ class _FiltersSheetState extends ConsumerState<FiltersSheet> {
                           if (countryByCode(code) case final c?)
                             InputChip(
                               label: Text('${c.flag} ${c.name}'),
-                              onDeleted: () => setState(() => _prefs = p.copyWith(countryCodes: {...p.countryCodes}..remove(code))),
+                              onDeleted: () =>
+                                  setState(() => _prefs = p.copyWith(countryCodes: {...p.countryCodes}..remove(code))),
                             ),
                         ActionChip(
                           avatar: const Icon(Icons.add_rounded, size: 18),
@@ -164,7 +166,11 @@ class _FiltersSheetState extends ConsumerState<FiltersSheet> {
                         child: FilledButton(
                           onPressed: _saving ? null : _apply,
                           child: _saving
-                              ? const SizedBox(width: 22, height: 22, child: CircularProgressIndicator(strokeWidth: 2.4))
+                              ? const SizedBox(
+                                  width: 22,
+                                  height: 22,
+                                  child: CircularProgressIndicator(strokeWidth: 2.4),
+                                )
                               : const Text('Apply'),
                         ),
                       ),

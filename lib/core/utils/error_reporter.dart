@@ -32,13 +32,16 @@ class ErrorReporter {
     if (last != null && DateTime.now().difference(last) < const Duration(minutes: 1)) return;
     _recent[message] = DateTime.now();
     try {
-      await Supabase.instance.client.rpc('log_client_error', params: {
-        'p_message': message.length > 2000 ? message.substring(0, 2000) : message,
-        'p_stack': stack?.toString(),
-        'p_context': context,
-        'p_platform': kIsWeb ? 'web' : defaultTargetPlatform.name,
-        'p_app_version': appVersion,
-      });
+      await Supabase.instance.client.rpc(
+        'log_client_error',
+        params: {
+          'p_message': message.length > 2000 ? message.substring(0, 2000) : message,
+          'p_stack': stack?.toString(),
+          'p_context': context,
+          'p_platform': kIsWeb ? 'web' : defaultTargetPlatform.name,
+          'p_app_version': appVersion,
+        },
+      );
     } catch (_) {
       // Never let error reporting crash the app.
     }

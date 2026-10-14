@@ -8,6 +8,7 @@ class Env {
   const Env._();
 
   static const supabaseUrl = String.fromEnvironment('SUPABASE_URL');
+
   /// The public "publishable" key (Settings → API Keys). A legacy `anon` key also works.
   static const supabasePublishableKey = String.fromEnvironment(
     'SUPABASE_PUBLISHABLE_KEY',

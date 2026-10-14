@@ -8,6 +8,7 @@ import '../../../core/router/app_router.dart';
 import '../../../core/theme/app_colors.dart';
 import '../../../core/widgets/app_logo.dart';
 import '../../../core/widgets/buttons.dart';
+import '../../../core/widgets/love_widgets.dart';
 import '../../../core/widgets/state_views.dart';
 import '../../legal/legal_screen.dart';
 import '../data/auth_repository.dart';
@@ -37,101 +38,78 @@ class _WelcomeScreenState extends ConsumerState<WelcomeScreen> {
   Widget build(BuildContext context) {
     final theme = Theme.of(context);
     return Scaffold(
-      body: Stack(
-        children: [
-          // Soft brand glow in the background.
-          Positioned(
-            top: -120,
-            right: -80,
-            child: Container(
-              width: 320,
-              height: 320,
-              decoration: BoxDecoration(
-                shape: BoxShape.circle,
-                gradient: RadialGradient(colors: [AppColors.rose.withValues(alpha: 0.28), Colors.transparent]),
-              ),
-            ),
-          ),
-          Positioned(
-            bottom: 80,
-            left: -120,
-            child: Container(
-              width: 300,
-              height: 300,
-              decoration: BoxDecoration(
-                shape: BoxShape.circle,
-                gradient: RadialGradient(colors: [AppColors.apricot.withValues(alpha: 0.22), Colors.transparent]),
-              ),
-            ),
-          ),
-          SafeArea(
-            child: LayoutBuilder(
-              builder: (context, constraints) => SingleChildScrollView(
-                padding: const EdgeInsets.symmetric(horizontal: AppSpacing.lg),
-                child: ConstrainedBox(
-                  constraints: BoxConstraints(minHeight: constraints.maxHeight),
-                  child: IntrinsicHeight(
-                    child: Column(
-                      children: [
-                        const Spacer(flex: 2),
-                        const AppLogo(size: 120, showWordmark: true),
-                        const SizedBox(height: AppSpacing.md),
-                        Text(
-                          'Real people. Real chemistry.\nStart something worth showing up for.',
-                          textAlign: TextAlign.center,
-                          style: theme.textTheme.titleMedium?.copyWith(
-                            color: theme.colorScheme.onSurfaceVariant,
-                            fontWeight: FontWeight.w500,
-                            height: 1.4,
-                          ),
-                        ),
-                        const Spacer(flex: 3),
-                        PrimaryButton(label: 'Create account', onPressed: () => context.push(Routes.signUp)),
-                        const SizedBox(height: AppSpacing.sm + 4),
-                        OutlinedButton(onPressed: () => context.push(Routes.signIn), child: const Text('Sign in')),
-                        if (Env.enableAppleSignIn) ...[
-                          const SizedBox(height: AppSpacing.sm + 4),
-                          OutlinedButton.icon(
-                            onPressed: _busy == null ? () => _social(OAuthProvider.apple) : null,
-                            icon: const Icon(Icons.apple),
-                            label: const Text('Continue with Apple'),
-                          ),
-                        ],
-                        if (Env.enableGoogleSignIn) ...[
-                          const SizedBox(height: AppSpacing.sm + 4),
-                          OutlinedButton.icon(
-                            onPressed: _busy == null ? () => _social(OAuthProvider.google) : null,
-                            icon: const Icon(Icons.g_mobiledata_rounded, size: 30),
-                            label: const Text('Continue with Google'),
-                          ),
-                        ],
-                        const SizedBox(height: AppSpacing.lg),
-                        Row(
-                          mainAxisAlignment: MainAxisAlignment.center,
-                          children: [
-                            Container(
-                              padding: const EdgeInsets.symmetric(horizontal: 8, vertical: 2),
-                              decoration: BoxDecoration(
-                                border: Border.all(color: theme.colorScheme.outline),
-                                borderRadius: BorderRadius.circular(6),
-                              ),
-                              child: Text('18+', style: theme.textTheme.labelMedium),
+      body: DreamyBackground(
+        child: Stack(
+          children: [
+            SafeArea(
+              child: LayoutBuilder(
+                builder: (context, constraints) => SingleChildScrollView(
+                  padding: const EdgeInsets.symmetric(horizontal: AppSpacing.lg),
+                  child: ConstrainedBox(
+                    constraints: BoxConstraints(minHeight: constraints.maxHeight),
+                    child: IntrinsicHeight(
+                      child: Column(
+                        children: [
+                          const Spacer(flex: 2),
+                          const AppLogo(size: 120, showWordmark: true),
+                          const SizedBox(height: AppSpacing.md),
+                          Text(
+                            'Find your sweetheart 💕\nReal people. Real chemistry.',
+                            textAlign: TextAlign.center,
+                            style: theme.textTheme.titleMedium?.copyWith(
+                              color: theme.colorScheme.onSurfaceVariant,
+                              fontWeight: FontWeight.w500,
+                              height: 1.4,
                             ),
-                            const SizedBox(width: 8),
-                            Text('Adults only', style: theme.textTheme.bodySmall),
+                          ),
+                          const Spacer(flex: 3),
+                          PrimaryButton(label: 'Create account', onPressed: () => context.push(Routes.signUp)),
+                          const SizedBox(height: AppSpacing.sm + 4),
+                          OutlinedButton(onPressed: () => context.push(Routes.signIn), child: const Text('Sign in')),
+                          if (Env.enableAppleSignIn) ...[
+                            const SizedBox(height: AppSpacing.sm + 4),
+                            OutlinedButton.icon(
+                              onPressed: _busy == null ? () => _social(OAuthProvider.apple) : null,
+                              icon: const Icon(Icons.apple),
+                              label: const Text('Continue with Apple'),
+                            ),
                           ],
-                        ),
-                        const SizedBox(height: AppSpacing.sm),
-                        const LegalText(),
-                        const SizedBox(height: AppSpacing.md),
-                      ],
+                          if (Env.enableGoogleSignIn) ...[
+                            const SizedBox(height: AppSpacing.sm + 4),
+                            OutlinedButton.icon(
+                              onPressed: _busy == null ? () => _social(OAuthProvider.google) : null,
+                              icon: const Icon(Icons.g_mobiledata_rounded, size: 30),
+                              label: const Text('Continue with Google'),
+                            ),
+                          ],
+                          const SizedBox(height: AppSpacing.lg),
+                          Row(
+                            mainAxisAlignment: MainAxisAlignment.center,
+                            children: [
+                              Container(
+                                padding: const EdgeInsets.symmetric(horizontal: 8, vertical: 2),
+                                decoration: BoxDecoration(
+                                  border: Border.all(color: theme.colorScheme.outline),
+                                  borderRadius: BorderRadius.circular(6),
+                                ),
+                                child: Text('18+', style: theme.textTheme.labelMedium),
+                              ),
+                              const SizedBox(width: 8),
+                              Text('Adults only', style: theme.textTheme.bodySmall),
+                            ],
+                          ),
+                          const SizedBox(height: AppSpacing.sm),
+                          const LegalText(),
+                          const SizedBox(height: AppSpacing.md),
+                        ],
+                      ),
                     ),
                   ),
                 ),
               ),
             ),
-          ),
-        ],
+          ],
+        ),
       ),
     );
   }
@@ -146,9 +124,12 @@ class LegalText extends StatelessWidget {
     final style = theme.textTheme.bodySmall?.copyWith(color: theme.colorScheme.onSurfaceVariant);
     final link = style?.copyWith(decoration: TextDecoration.underline, fontWeight: FontWeight.w600);
     Widget linkButton(String label, LegalDoc doc) => InkWell(
-          onTap: () => openLegal(context, doc),
-          child: Padding(padding: const EdgeInsets.symmetric(vertical: 4), child: Text(label, style: link)),
-        );
+      onTap: () => openLegal(context, doc),
+      child: Padding(
+        padding: const EdgeInsets.symmetric(vertical: 4),
+        child: Text(label, style: link),
+      ),
+    );
     return Column(
       children: [
         Text('By continuing you agree to our', style: style, textAlign: TextAlign.center),

@@ -8,17 +8,17 @@ import 'package:woops/features/profile/domain/profile_models.dart';
 import 'package:supabase_flutter/supabase_flutter.dart';
 
 ProfileCard card(String id, {String? name, int age = 27}) => ProfileCard(
-      id: id,
-      displayName: name ?? 'User $id',
-      age: age,
-      gender: Gender.woman,
-      bio: 'Bio of $id',
-      intention: Intention.longTerm,
-      photos: const [],
-      interests: const ['Hiking'],
-      prompts: const [],
-      distanceKm: 3,
-    );
+  id: id,
+  displayName: name ?? 'User $id',
+  age: age,
+  gender: Gender.woman,
+  bio: 'Bio of $id',
+  intention: Intention.longTerm,
+  photos: const [],
+  interests: const ['Hiking'],
+  prompts: const [],
+  distanceKm: 3,
+);
 
 class FakeDiscoveryRepository implements DiscoveryRepository {
   FakeDiscoveryRepository(this.pages);
@@ -42,7 +42,11 @@ class FakeDiscoveryRepository implements DiscoveryRepository {
     if (swipeError != null) throw swipeError!;
     swipes.add((targetId, action));
     final matched = action == SwipeAction.like && matchOnLike.contains(targetId);
-    return SwipeResult(matched: matched, matchId: matched ? 'm-$targetId' : null, conversationId: matched ? 'c-$targetId' : null);
+    return SwipeResult(
+      matched: matched,
+      matchId: matched ? 'm-$targetId' : null,
+      conversationId: matched ? 'c-$targetId' : null,
+    );
   }
 
   @override
@@ -117,11 +121,11 @@ class FakeChatRepository implements ChatRepository {
 }
 
 ChatMessage msg(String id, {String sender = 'other', required DateTime at, String? clientId}) => ChatMessage(
-      id: id,
-      conversationId: 'c1',
-      senderId: sender,
-      clientId: clientId ?? 'client-$id',
-      kind: MessageKind.text,
-      body: 'message $id',
-      createdAt: at,
-    );
+  id: id,
+  conversationId: 'c1',
+  senderId: sender,
+  clientId: clientId ?? 'client-$id',
+  kind: MessageKind.text,
+  body: 'message $id',
+  createdAt: at,
+);

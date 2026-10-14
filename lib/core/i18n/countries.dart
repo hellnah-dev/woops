@@ -266,12 +266,7 @@ ZW|Zimbabwe
 
 /// All countries, sorted by name.
 final List<Country> allCountries = (() {
-  final list = _data
-      .trim()
-      .split('\n')
-      .map((line) => line.split('|'))
-      .map((p) => Country(p[0], p[1]))
-      .toList()
+  final list = _data.trim().split('\n').map((line) => line.split('|')).map((p) => Country(p[0], p[1])).toList()
     ..sort((a, b) => a.name.compareTo(b.name));
   return List<Country>.unmodifiable(list);
 })();

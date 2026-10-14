@@ -4,6 +4,7 @@ import 'package:go_router/go_router.dart';
 import 'package:url_launcher/url_launcher.dart';
 
 import '../../../core/config/env.dart';
+import '../../../core/permissions/permission_gate.dart';
 import '../../../core/router/app_router.dart';
 import '../../../core/supabase/supabase_providers.dart';
 import '../../../core/theme/app_colors.dart';
@@ -48,6 +49,7 @@ class SettingsScreen extends ConsumerWidget {
   }
 
   Future<void> _updateLocation(BuildContext context, WidgetRef ref) async {
+    if (!await PermissionGate.request(context, AppPermission.location)) return;
     try {
       await ref.read(locationServiceProvider).updateMyLocation();
       ref.read(discoveryControllerProvider.notifier).load(reset: true);
@@ -106,7 +108,11 @@ class SettingsScreen extends ConsumerWidget {
                 : const SizedBox.shrink(),
           ),
           if (email != null)
-            ListTile(leading: const Icon(Icons.alternate_email_rounded), title: const Text('Email'), subtitle: Text(email)),
+            ListTile(
+              leading: const Icon(Icons.alternate_email_rounded),
+              title: const Text('Email'),
+              subtitle: Text(email),
+            ),
           const _Header('Safety & support'),
           ListTile(
             leading: const Icon(Icons.shield_outlined),
@@ -128,6 +134,11 @@ class SettingsScreen extends ConsumerWidget {
             title: const Text('Help & support'),
             subtitle: const Text(Env.supportEmail),
             onTap: () => _open(context, 'mailto:${Env.supportEmail}?subject=Woops%20support'),
+          ),
+          ListTile(
+            leading: const Icon(Icons.info_outline_rounded),
+            title: const Text('About Woops'),
+            onTap: () => context.push(Routes.about),
           ),
           const _Header(''),
           ListTile(
@@ -152,15 +163,14 @@ class _Header extends StatelessWidget {
 
   @override
   Widget build(BuildContext context) => Padding(
-        padding: const EdgeInsets.fromLTRB(AppSpacing.md, AppSpacing.lg, AppSpacing.md, AppSpacing.xs),
-        child: Text(
-          text.toUpperCase(),
-          style: Theme.of(context).textTheme.labelMedium?.copyWith(
-                color: Theme.of(context).colorScheme.primary,
-                letterSpacing: 1,
-              ),
-        ),
-      );
+    padding: const EdgeInsets.fromLTRB(AppSpacing.md, AppSpacing.lg, AppSpacing.md, AppSpacing.xs),
+    child: Text(
+      text.toUpperCase(),
+      style: Theme.of(
+        context,
+      ).textTheme.labelMedium?.copyWith(color: Theme.of(context).colorScheme.primary, letterSpacing: 1),
+    ),
+  );
 }
 
 class _DeleteAccountDialog extends ConsumerStatefulWidget {
@@ -203,8 +213,10 @@ class _DeleteAccountDialogState extends ConsumerState<_DeleteAccountDialog> {
         mainAxisSize: MainAxisSize.min,
         crossAxisAlignment: CrossAxisAlignment.start,
         children: [
-          const Text('This permanently deletes your profile, photos, matches and messages. '
-              'It can’t be undone.\n\nIf you just need a break, you can pause your profile in Privacy settings.'),
+          const Text(
+            'This permanently deletes your profile, photos, matches and messages. '
+            'It can’t be undone.\n\nIf you just need a break, you can pause your profile in Privacy settings.',
+          ),
           const SizedBox(height: 16),
           TextField(
             controller: _confirm,
@@ -313,6 +325,12 @@ class PrivacySettingsScreen extends ConsumerWidget {
               subtitle: const Text('Others see an approximate distance, never your location.'),
               value: s.showDistance,
               onChanged: (v) => _save(context, ref, s.copyWith(showDistance: v)),
+            ),
+            SwitchListTile(
+              title: const Text('Show my zodiac sign'),
+              subtitle: const Text('Only your sign is shown, never your birthday.'),
+              value: s.showZodiac,
+              onChanged: (v) => _save(context, ref, s.copyWith(showZodiac: v)),
             ),
             SwitchListTile(
               title: const Text('Read receipts'),

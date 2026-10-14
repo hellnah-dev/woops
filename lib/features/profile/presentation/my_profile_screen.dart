@@ -65,6 +65,11 @@ class MyProfileScreen extends ConsumerWidget {
                 ),
                 if (p.username != null)
                   Text('@${p.username}', textAlign: TextAlign.center, style: theme.textTheme.bodyLarge),
+                Text(
+                  '${p.zodiac.symbol} ${p.zodiac.label}',
+                  textAlign: TextAlign.center,
+                  style: theme.textTheme.bodyMedium,
+                ),
                 const SizedBox(height: 4),
                 Text(
                   '${(completeness * 100).round()}% complete',
@@ -94,14 +99,11 @@ class MyProfileScreen extends ConsumerWidget {
                 const SizedBox(height: AppSpacing.md),
                 Card(
                   child: ListTile(
-                    leading: Icon(
-                      p.isVerified ? Icons.verified_rounded : Icons.verified_outlined,
-                      color: Colors.blue,
-                    ),
+                    leading: Icon(p.isVerified ? Icons.verified_rounded : Icons.verified_outlined, color: Colors.blue),
                     title: Text(p.isVerified ? 'Photo verified' : 'Get verified'),
-                    subtitle: Text(p.isVerified
-                        ? 'Your profile shows a blue badge'
-                        : 'Take a quick selfie to earn a blue badge'),
+                    subtitle: Text(
+                      p.isVerified ? 'Your profile shows a blue badge' : 'Take a quick selfie to earn a blue badge',
+                    ),
                     trailing: p.isVerified ? null : const Icon(Icons.chevron_right_rounded),
                     onTap: p.isVerified ? null : () => context.push(Routes.verify),
                   ),
@@ -114,11 +116,13 @@ class MyProfileScreen extends ConsumerWidget {
                       child: Column(
                         crossAxisAlignment: CrossAxisAlignment.start,
                         children: [
-                          Row(children: [
-                            const Icon(Icons.auto_awesome_rounded, color: AppColors.apricot),
-                            const SizedBox(width: 8),
-                            Text('Stand out', style: theme.textTheme.titleMedium),
-                          ]),
+                          Row(
+                            children: [
+                              const Icon(Icons.auto_awesome_rounded, color: AppColors.apricot),
+                              const SizedBox(width: 8),
+                              Text('Stand out', style: theme.textTheme.titleMedium),
+                            ],
+                          ),
                           const SizedBox(height: 8),
                           if (p.photos.length < 4) const _Tip('Add more photos (4+ works best)'),
                           if (p.bio.trim().isEmpty) const _Tip('Write a short bio'),
@@ -160,13 +164,13 @@ class _Tip extends StatelessWidget {
 
   @override
   Widget build(BuildContext context) => Padding(
-        padding: const EdgeInsets.symmetric(vertical: 3),
-        child: Row(
-          crossAxisAlignment: CrossAxisAlignment.start,
-          children: [
-            const Text('•  '),
-            Expanded(child: Text(text)),
-          ],
-        ),
-      );
+    padding: const EdgeInsets.symmetric(vertical: 3),
+    child: Row(
+      crossAxisAlignment: CrossAxisAlignment.start,
+      children: [
+        const Text('•  '),
+        Expanded(child: Text(text)),
+      ],
+    ),
+  );
 }

@@ -38,8 +38,7 @@ class _AuthScaffold extends StatelessWidget {
               const SizedBox(height: AppSpacing.lg),
               Text(title, style: theme.textTheme.headlineMedium),
               const SizedBox(height: AppSpacing.sm),
-              Text(subtitle,
-                  style: theme.textTheme.bodyLarge?.copyWith(color: theme.colorScheme.onSurfaceVariant)),
+              Text(subtitle, style: theme.textTheme.bodyLarge?.copyWith(color: theme.colorScheme.onSurfaceVariant)),
               const SizedBox(height: AppSpacing.xl),
               child,
             ],
@@ -248,8 +247,10 @@ class _SignUpScreenState extends ConsumerState<SignUpScreen> {
           builder: (context) => AlertDialog(
             icon: const Icon(Icons.mark_email_unread_outlined),
             title: const Text('Check your email'),
-            content: Text('We sent a confirmation link to ${_email.text.trim()}. '
-                'Open it on this phone to finish creating your account.'),
+            content: Text(
+              'We sent a confirmation link to ${_email.text.trim()}. '
+              'Open it on this phone to finish creating your account.',
+            ),
             actions: [TextButton(onPressed: () => Navigator.pop(context), child: const Text('OK'))],
           ),
         );
@@ -374,7 +375,14 @@ class _SignUpScreenState extends ConsumerState<SignUpScreen> {
 }
 
 class _GateTile extends StatelessWidget {
-  const _GateTile({super.key, required this.icon, required this.label, required this.value, required this.onTap, this.error});
+  const _GateTile({
+    super.key,
+    required this.icon,
+    required this.label,
+    required this.value,
+    required this.onTap,
+    this.error,
+  });
 
   final IconData icon;
   final String label;
@@ -404,16 +412,16 @@ class _InlineLink extends StatelessWidget {
 
   @override
   Widget build(BuildContext context) => InkWell(
-        onTap: onTap,
-        child: Text(
-          text,
-          style: TextStyle(
-            color: Theme.of(context).colorScheme.primary,
-            fontWeight: FontWeight.w600,
-            decoration: TextDecoration.underline,
-          ),
-        ),
-      );
+    onTap: onTap,
+    child: Text(
+      text,
+      style: TextStyle(
+        color: Theme.of(context).colorScheme.primary,
+        fontWeight: FontWeight.w600,
+        decoration: TextDecoration.underline,
+      ),
+    ),
+  );
 }
 
 // -----------------------------------------------------------------------------

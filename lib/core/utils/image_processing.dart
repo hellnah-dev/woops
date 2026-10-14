@@ -14,12 +14,8 @@ enum ImageFormat {
 }
 
 /// Re-encodes [input] so its shorter side is at most [size] px.
-typedef ImageEncoder = Future<Uint8List> Function(
-  Uint8List input, {
-  required int size,
-  required int quality,
-  required ImageFormat format,
-});
+typedef ImageEncoder =
+    Future<Uint8List> Function(Uint8List input, {required int size, required int quality, required ImageFormat format});
 
 class ProcessedPhoto {
   const ProcessedPhoto({required this.full, required this.format, this.thumbnail});
@@ -52,15 +48,14 @@ class ImageProcessor {
     required int size,
     required int quality,
     required ImageFormat format,
-  }) =>
-      FlutterImageCompress.compressWithList(
-        input,
-        minWidth: size,
-        minHeight: size,
-        quality: quality,
-        format: format.compressFormat,
-        keepExif: false,
-      );
+  }) => FlutterImageCompress.compressWithList(
+    input,
+    minWidth: size,
+    minHeight: size,
+    quality: quality,
+    format: format.compressFormat,
+    keepExif: false,
+  );
 
   Future<ProcessedPhoto> processProfilePhoto(Uint8List input) async {
     // On the web the browser's image picker already re-encodes and resizes
@@ -80,8 +75,10 @@ class ImageProcessor {
         // Try the next format (WebP isn't available on every device).
       }
     }
-    throw const AppException('This photo format isn’t supported. Please choose a JPEG, PNG or HEIC photo.',
-        code: 'unsupported_image');
+    throw const AppException(
+      'This photo format isn’t supported. Please choose a JPEG, PNG or HEIC photo.',
+      code: 'unsupported_image',
+    );
   }
 
   Future<Uint8List> processSelfie(Uint8List input) async {

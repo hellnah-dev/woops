@@ -1,4 +1,6 @@
+import 'package:flutter/foundation.dart';
 import 'package:flutter/material.dart';
+import 'package:flutter/services.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
 import 'package:intl/date_symbol_data_local.dart';
 import 'package:intl/intl.dart';
@@ -12,6 +14,7 @@ import 'features/notifications/push_service.dart';
 
 Future<void> main() async {
   WidgetsFlutterBinding.ensureInitialized();
+  _registerFontLicenses();
 
   if (!Env.isSupabaseConfigured) {
     runApp(const _MissingConfigApp());
@@ -28,6 +31,15 @@ Future<void> main() async {
   await PushService.initializeFirebase();
 
   runApp(const ProviderScope(child: WoopsApp()));
+}
+
+/// Bundled fonts are under the SIL Open Font License; list them on the licenses page.
+void _registerFontLicenses() {
+  for (final (family, file) in [('Nunito', 'OFL-Nunito.txt'), ('Pacifico', 'OFL-Pacifico.txt')]) {
+    LicenseRegistry.addLicense(() async* {
+      yield LicenseEntryWithLineBreaks([family], await rootBundle.loadString('assets/fonts/$file'));
+    });
+  }
 }
 
 /// Shown when the app is started without `--dart-define-from-file=.env`.

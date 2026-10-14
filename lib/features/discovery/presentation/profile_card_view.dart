@@ -89,19 +89,28 @@ class _ProfileCardViewState extends State<ProfileCardView> {
                           mainAxisSize: MainAxisSize.min,
                           children: [
                             Text.rich(
-                              TextSpan(children: [
-                                TextSpan(text: card.displayName),
-                                TextSpan(text: '  ${card.age}', style: const TextStyle(fontWeight: FontWeight.w400)),
-                                if (card.isVerified)
-                                  const WidgetSpan(
-                                    alignment: PlaceholderAlignment.middle,
-                                    child: Padding(
-                                      padding: EdgeInsets.only(left: 6),
-                                      child: Icon(Icons.verified_rounded, color: Colors.lightBlueAccent, size: 24,
-                                          semanticLabel: 'Photo verified'),
-                                    ),
+                              TextSpan(
+                                children: [
+                                  TextSpan(text: card.displayName),
+                                  TextSpan(
+                                    text: '  ${card.age}',
+                                    style: const TextStyle(fontWeight: FontWeight.w400),
                                   ),
-                              ]),
+                                  if (card.isVerified)
+                                    const WidgetSpan(
+                                      alignment: PlaceholderAlignment.middle,
+                                      child: Padding(
+                                        padding: EdgeInsets.only(left: 6),
+                                        child: Icon(
+                                          Icons.verified_rounded,
+                                          color: Colors.lightBlueAccent,
+                                          size: 24,
+                                          semanticLabel: 'Photo verified',
+                                        ),
+                                      ),
+                                    ),
+                                ],
+                              ),
                               maxLines: 1,
                               overflow: TextOverflow.ellipsis,
                               style: theme.textTheme.headlineMedium?.copyWith(color: Colors.white),
@@ -114,6 +123,7 @@ class _ProfileCardViewState extends State<ProfileCardView> {
                                 _Pill(text: '${card.intention.emoji} ${card.intention.label}'),
                                 if (card.distanceKm != null)
                                   _Pill(icon: Icons.near_me_rounded, text: DistanceUnits.away(card.distanceKm!)),
+                                if (card.zodiac case final z?) _Pill(text: '${z.symbol} ${z.label}'),
                                 if (countryByCode(card.countryCode) case final c?)
                                   _Pill(text: '${c.flag} ${card.city?.isNotEmpty == true ? card.city! : c.name}'),
                                 if ((card.jobTitle ?? '').isNotEmpty)
@@ -126,7 +136,9 @@ class _ProfileCardViewState extends State<ProfileCardView> {
                                 card.bio,
                                 maxLines: 2,
                                 overflow: TextOverflow.ellipsis,
-                                style: theme.textTheme.bodyMedium?.copyWith(color: Colors.white.withValues(alpha: 0.92)),
+                                style: theme.textTheme.bodyMedium?.copyWith(
+                                  color: Colors.white.withValues(alpha: 0.92),
+                                ),
                               ),
                             ],
                           ],

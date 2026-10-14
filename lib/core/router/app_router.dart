@@ -19,6 +19,7 @@ import '../../features/profile/presentation/edit_profile_screen.dart';
 import '../../features/profile/presentation/my_profile_screen.dart';
 import '../../features/profile/presentation/profile_detail_screen.dart';
 import '../../features/profile/presentation/verification_screen.dart';
+import '../../features/settings/presentation/about_screen.dart';
 import '../../features/settings/presentation/settings_screens.dart';
 import '../supabase/supabase_providers.dart';
 import 'home_shell.dart';
@@ -43,6 +44,7 @@ class Routes {
   static const notificationSettings = '/settings/notifications';
   static const privacySettings = '/settings/privacy';
   static const blockedUsers = '/settings/blocked';
+  static const about = '/settings/about';
 
   static String chat(String conversationId) => '/chat/$conversationId';
   static String user(String userId) => '/user/$userId';
@@ -97,7 +99,9 @@ class _RouterRefresh extends ChangeNotifier {
     final p = profile.value;
     if (p == null || !p.onboardingCompleted) return loc == Routes.onboarding ? null : Routes.onboarding;
 
-    if (Routes._signedOut.contains(loc) || loc == Routes.splash || loc == Routes.onboarding ||
+    if (Routes._signedOut.contains(loc) ||
+        loc == Routes.splash ||
+        loc == Routes.onboarding ||
         loc == Routes.resetPassword) {
       return Routes.discover;
     }
@@ -133,18 +137,24 @@ final routerProvider = Provider<GoRouter>((ref) {
       StatefulShellRoute.indexedStack(
         builder: (context, state, shell) => HomeShell(shell: shell),
         branches: [
-          StatefulShellBranch(routes: [GoRoute(path: Routes.discover, builder: (_, _) => const DiscoverScreen())]),
-          StatefulShellBranch(routes: [GoRoute(path: Routes.likes, builder: (_, _) => const LikesScreen())]),
-          StatefulShellBranch(routes: [GoRoute(path: Routes.matches, builder: (_, _) => const MatchesScreen())]),
-          StatefulShellBranch(routes: [GoRoute(path: Routes.chats, builder: (_, _) => const ConversationsScreen())]),
-          StatefulShellBranch(routes: [GoRoute(path: Routes.profile, builder: (_, _) => const MyProfileScreen())]),
+          StatefulShellBranch(
+            routes: [GoRoute(path: Routes.discover, builder: (_, _) => const DiscoverScreen())],
+          ),
+          StatefulShellBranch(
+            routes: [GoRoute(path: Routes.likes, builder: (_, _) => const LikesScreen())],
+          ),
+          StatefulShellBranch(
+            routes: [GoRoute(path: Routes.matches, builder: (_, _) => const MatchesScreen())],
+          ),
+          StatefulShellBranch(
+            routes: [GoRoute(path: Routes.chats, builder: (_, _) => const ConversationsScreen())],
+          ),
+          StatefulShellBranch(
+            routes: [GoRoute(path: Routes.profile, builder: (_, _) => const MyProfileScreen())],
+          ),
         ],
       ),
-      GoRoute(
-        path: Routes.verify,
-        parentNavigatorKey: rootNavigatorKey,
-        builder: (_, _) => const VerificationScreen(),
-      ),
+      GoRoute(path: Routes.verify, parentNavigatorKey: rootNavigatorKey, builder: (_, _) => const VerificationScreen()),
       GoRoute(
         path: Routes.editProfile,
         parentNavigatorKey: rootNavigatorKey,
@@ -153,10 +163,8 @@ final routerProvider = Provider<GoRouter>((ref) {
       GoRoute(
         path: '/chat/:conversationId',
         parentNavigatorKey: rootNavigatorKey,
-        builder: (_, state) => ChatScreen(
-          conversationId: state.pathParameters['conversationId']!,
-          args: state.extra as ChatRouteArgs?,
-        ),
+        builder: (_, state) =>
+            ChatScreen(conversationId: state.pathParameters['conversationId']!, args: state.extra as ChatRouteArgs?),
       ),
       GoRoute(
         path: '/user/:userId',
@@ -178,6 +186,7 @@ final routerProvider = Provider<GoRouter>((ref) {
           GoRoute(path: 'notifications', builder: (_, _) => const NotificationSettingsScreen()),
           GoRoute(path: 'privacy', builder: (_, _) => const PrivacySettingsScreen()),
           GoRoute(path: 'blocked', builder: (_, _) => const BlockedUsersScreen()),
+          GoRoute(path: 'about', builder: (_, _) => const AboutScreen()),
         ],
       ),
     ],

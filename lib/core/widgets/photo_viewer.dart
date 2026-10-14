@@ -6,12 +6,14 @@ import 'profile_photo.dart';
 /// double-tap to zoom, swipe down (or tap ✕) to close.
 Future<void> showPhotoViewer(BuildContext context, {required List<String> photos, int initialIndex = 0}) {
   if (photos.isEmpty) return Future.value();
-  return Navigator.of(context, rootNavigator: true).push(PageRouteBuilder<void>(
-    opaque: false,
-    barrierColor: Colors.black,
-    pageBuilder: (_, _, _) => PhotoViewer(photos: photos, initialIndex: initialIndex),
-    transitionsBuilder: (_, animation, _, child) => FadeTransition(opacity: animation, child: child),
-  ));
+  return Navigator.of(context, rootNavigator: true).push(
+    PageRouteBuilder<void>(
+      opaque: false,
+      barrierColor: Colors.black,
+      pageBuilder: (_, _, _) => PhotoViewer(photos: photos, initialIndex: initialIndex),
+      transitionsBuilder: (_, animation, _, child) => FadeTransition(opacity: animation, child: child),
+    ),
+  );
 }
 
 class PhotoViewer extends StatefulWidget {
@@ -62,10 +64,8 @@ class _PhotoViewerState extends State<PhotoViewer> {
                 physics: _zoomed ? const NeverScrollableScrollPhysics() : null,
                 itemCount: widget.photos.length,
                 onPageChanged: (i) => setState(() => _index = i),
-                itemBuilder: (_, i) => _ZoomablePhoto(
-                  path: widget.photos[i],
-                  onZoomChanged: (z) => setState(() => _zoomed = z),
-                ),
+                itemBuilder: (_, i) =>
+                    _ZoomablePhoto(path: widget.photos[i], onZoomChanged: (z) => setState(() => _zoomed = z)),
               ),
             ),
           ),
@@ -122,7 +122,10 @@ class _ZoomablePhotoState extends State<_ZoomablePhoto> with SingleTickerProvide
   }
 
   void _animateTo(Matrix4 target) {
-    _animation = Matrix4Tween(begin: _transform.value, end: target).animate(CurvedAnimation(parent: _anim, curve: Curves.easeOut));
+    _animation = Matrix4Tween(
+      begin: _transform.value,
+      end: target,
+    ).animate(CurvedAnimation(parent: _anim, curve: Curves.easeOut));
     _anim.forward(from: 0);
     widget.onZoomChanged(target != Matrix4.identity());
   }
@@ -133,9 +136,11 @@ class _ZoomablePhotoState extends State<_ZoomablePhoto> with SingleTickerProvide
     } else {
       final p = _doubleTap?.localPosition ?? Offset.zero;
       const scale = 2.5;
-      _animateTo(Matrix4.identity()
-        ..translateByDouble(-p.dx * (scale - 1), -p.dy * (scale - 1), 0, 1)
-        ..scaleByDouble(scale, scale, 1, 1));
+      _animateTo(
+        Matrix4.identity()
+          ..translateByDouble(-p.dx * (scale - 1), -p.dy * (scale - 1), 0, 1)
+          ..scaleByDouble(scale, scale, 1, 1),
+      );
     }
   }
 

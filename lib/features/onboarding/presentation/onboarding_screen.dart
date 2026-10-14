@@ -3,6 +3,7 @@ import 'package:flutter_riverpod/flutter_riverpod.dart';
 import 'package:intl/intl.dart';
 
 import '../../../core/i18n/countries.dart';
+import '../../../core/permissions/permission_gate.dart';
 import '../../../core/theme/app_colors.dart';
 import '../../../core/utils/app_exception.dart';
 import '../../../core/utils/validators.dart';
@@ -115,18 +116,18 @@ class _OnboardingScreenState extends ConsumerState<OnboardingScreen> {
   }
 
   bool get _canContinue => switch (_step) {
-        _Step.consent => _consentAdult && _consentTerms,
-        _Step.name => Validators.displayName(_name.text) == null && _usernameOk,
-        _Step.place => _country != null && Validators.maxLength(_city.text, 80) == null,
-        _Step.birthday => _birthdate != null && ageFromBirthdate(_birthdate!) >= _minAge,
-        _Step.gender => _gender != null,
-        _Step.interestedIn => _interestedIn.isNotEmpty,
-        _Step.intention => _intention != null,
-        _Step.interests => _interestIds.isNotEmpty,
-        _Step.photos => (ref.watch(myProfileProvider).valueOrNull?.photos.length ?? 0) >= 1,
-        _Step.about => Validators.maxLength(_bio.text, 500) == null,
-        _Step.location => true,
-      };
+    _Step.consent => _consentAdult && _consentTerms,
+    _Step.name => Validators.displayName(_name.text) == null && _usernameOk,
+    _Step.place => _country != null && Validators.maxLength(_city.text, 80) == null,
+    _Step.birthday => _birthdate != null && ageFromBirthdate(_birthdate!) >= _minAge,
+    _Step.gender => _gender != null,
+    _Step.interestedIn => _interestedIn.isNotEmpty,
+    _Step.intention => _intention != null,
+    _Step.interests => _interestIds.isNotEmpty,
+    _Step.photos => (ref.watch(myProfileProvider).valueOrNull?.photos.length ?? 0) >= 1,
+    _Step.about => Validators.maxLength(_bio.text, 500) == null,
+    _Step.location => true,
+  };
 
   Future<void> _next() async {
     FocusScope.of(context).unfocus();
@@ -138,17 +139,21 @@ class _OnboardingScreenState extends ConsumerState<OnboardingScreen> {
         case _Step.place:
           _minAge = await ref.read(authRepositoryProvider).minAgeFor(_country!);
         case _Step.interests when !_profileCreated:
-          await ref.read(profileRepositoryProvider).createProfile(ProfileDraft(
-                displayName: _name.text,
-                birthdate: _birthdate!,
-                gender: _gender!,
-                interestedIn: _interestedIn,
-                intention: _intention!,
-                interestIds: _interestIds,
-                countryCode: _country!,
-                username: _username,
-                city: _city.text,
-              ));
+          await ref
+              .read(profileRepositoryProvider)
+              .createProfile(
+                ProfileDraft(
+                  displayName: _name.text,
+                  birthdate: _birthdate!,
+                  gender: _gender!,
+                  interestedIn: _interestedIn,
+                  intention: _intention!,
+                  interestIds: _interestIds,
+                  countryCode: _country!,
+                  username: _username,
+                  city: _city.text,
+                ),
+              );
           _profileCreated = true;
           await ref.read(myProfileProvider.notifier).refresh();
         case _Step.about:
@@ -171,6 +176,8 @@ class _OnboardingScreenState extends ConsumerState<OnboardingScreen> {
   }
 
   Future<void> _enableLocation() async {
+    if (!await PermissionGate.request(context, AppPermission.location)) return;
+    if (!mounted) return;
     setState(() => _busy = true);
     try {
       await ref.read(locationServiceProvider).updateMyLocation();
@@ -238,10 +245,7 @@ class _OnboardingScreenState extends ConsumerState<OnboardingScreen> {
             child: LinearProgressIndicator(value: progress, minHeight: 6),
           ),
           actions: [
-            TextButton(
-              onPressed: () => ref.read(authRepositoryProvider).signOut(),
-              child: const Text('Sign out'),
-            ),
+            TextButton(onPressed: () => ref.read(authRepositoryProvider).signOut(), child: const Text('Sign out')),
           ],
         ),
         body: SafeArea(
@@ -293,179 +297,234 @@ class _OnboardingScreenState extends ConsumerState<OnboardingScreen> {
   }
 
   Widget _header(ThemeData theme, String title, [String? subtitle]) => Padding(
-        padding: const EdgeInsets.only(bottom: AppSpacing.lg),
-        child: Column(
-          crossAxisAlignment: CrossAxisAlignment.start,
-          children: [
-            Text(title, style: theme.textTheme.headlineMedium),
-            if (subtitle != null) ...[
-              const SizedBox(height: AppSpacing.sm),
-              Text(subtitle, style: theme.textTheme.bodyLarge?.copyWith(color: theme.colorScheme.onSurfaceVariant)),
-            ],
-          ],
-        ),
-      );
+    padding: const EdgeInsets.only(bottom: AppSpacing.lg),
+    child: Column(
+      crossAxisAlignment: CrossAxisAlignment.start,
+      children: [
+        Text(title, style: theme.textTheme.headlineMedium),
+        if (subtitle != null) ...[
+          const SizedBox(height: AppSpacing.sm),
+          Text(subtitle, style: theme.textTheme.bodyLarge?.copyWith(color: theme.colorScheme.onSurfaceVariant)),
+        ],
+      ],
+    ),
+  );
 
   Widget _buildStep(ThemeData theme) {
     switch (_step) {
       case _Step.consent:
-        return Column(crossAxisAlignment: CrossAxisAlignment.start, children: [
-          _header(theme, 'Before you start', 'Woops is a community for adults. Please confirm the following.'),
-          CheckboxListTile(
-            value: _consentAdult,
-            contentPadding: EdgeInsets.zero,
-            controlAffinity: ListTileControlAffinity.leading,
-            onChanged: (v) => setState(() => _consentAdult = v ?? false),
-            title: Text('I am at least $_minAge years old'),
-            subtitle: const Text('Or older, if the law in my country requires it.'),
-          ),
-          CheckboxListTile(
-            value: _consentTerms,
-            contentPadding: EdgeInsets.zero,
-            controlAffinity: ListTileControlAffinity.leading,
-            onChanged: (v) => setState(() => _consentTerms = v ?? false),
-            title: const Text('I agree to the Terms, Privacy Policy and Community Guidelines'),
-          ),
-          Wrap(spacing: 8, children: [
-            for (final doc in LegalDoc.values)
-              TextButton(onPressed: () => openLegal(context, doc), child: Text(doc.title)),
-          ]),
-        ]);
-      case _Step.name:
-        return Column(crossAxisAlignment: CrossAxisAlignment.start, children: [
-          _header(theme, 'What’s your first name?', 'This is how you’ll appear on Woops.'),
-          TextField(
-            key: const Key('onboarding-name'),
-            controller: _name,
-            autofocus: true,
-            maxLength: 40,
-            textCapitalization: TextCapitalization.words,
-            decoration: const InputDecoration(hintText: 'First name'),
-            onChanged: (_) => setState(() {}),
-          ),
-          const SizedBox(height: AppSpacing.sm),
-          Text('Pick a username', style: theme.textTheme.titleMedium),
-          const SizedBox(height: AppSpacing.sm),
-          UsernameField(onChanged: (v, ok) => setState(() {
-                _username = v;
-                _usernameOk = ok;
-              })),
-        ]);
-      case _Step.place:
-        final country = countryByCode(_country);
-        return Column(crossAxisAlignment: CrossAxisAlignment.start, children: [
-          _header(theme, 'Where are you based?', 'Shown on your profile. People anywhere in the world can use Woops.'),
-          OutlinedButton.icon(
-            onPressed: () async {
-              final c = await showCountryPicker(context, selected: _country);
-              if (c != null) setState(() => _country = c.code);
-            },
-            icon: Text(country?.flag ?? '🌍', style: const TextStyle(fontSize: 20)),
-            label: Text(country?.name ?? 'Choose your country'),
-          ),
-          const SizedBox(height: AppSpacing.md),
-          TextField(
-            controller: _city,
-            maxLength: 80,
-            textCapitalization: TextCapitalization.words,
-            decoration: const InputDecoration(hintText: 'City (optional)'),
-            onChanged: (_) => setState(() {}),
-          ),
-        ]);
-      case _Step.birthday:
-        final age = _birthdate == null ? null : ageFromBirthdate(_birthdate!);
-        return Column(crossAxisAlignment: CrossAxisAlignment.start, children: [
-          _header(theme, 'When’s your birthday?', 'Only your age is shown. You can’t change this later.'),
-          OutlinedButton.icon(
-            onPressed: _birthdateLocked ? null : _pickBirthdate,
-            icon: const Icon(Icons.cake_outlined),
-            label: Text(_birthdate == null ? 'Select date' : DateFormat.yMMMMd().format(_birthdate!)),
-          ),
-          if (_birthdateLocked)
-            Padding(
-              padding: const EdgeInsets.only(top: 8),
-              child: Text('From your sign-up.', style: theme.textTheme.bodySmall),
+        return Column(
+          crossAxisAlignment: CrossAxisAlignment.start,
+          children: [
+            _header(theme, 'Before you start', 'Woops is a community for adults. Please confirm the following.'),
+            CheckboxListTile(
+              value: _consentAdult,
+              contentPadding: EdgeInsets.zero,
+              controlAffinity: ListTileControlAffinity.leading,
+              onChanged: (v) => setState(() => _consentAdult = v ?? false),
+              title: Text('I am at least $_minAge years old'),
+              subtitle: const Text('Or older, if the law in my country requires it.'),
             ),
-          if (age != null) ...[
-            const SizedBox(height: AppSpacing.md),
-            Text(
-              age >= _minAge ? 'You’re $age.' : 'Sorry, you must be at least $_minAge to use Woops in your country.',
-              style: theme.textTheme.titleMedium?.copyWith(color: age >= _minAge ? null : theme.colorScheme.error),
+            CheckboxListTile(
+              value: _consentTerms,
+              contentPadding: EdgeInsets.zero,
+              controlAffinity: ListTileControlAffinity.leading,
+              onChanged: (v) => setState(() => _consentTerms = v ?? false),
+              title: const Text('I agree to the Terms, Privacy Policy and Community Guidelines'),
+            ),
+            Wrap(
+              spacing: 8,
+              children: [
+                for (final doc in LegalDoc.values)
+                  TextButton(onPressed: () => openLegal(context, doc), child: Text(doc.title)),
+              ],
             ),
           ],
-        ]);
+        );
+      case _Step.name:
+        return Column(
+          crossAxisAlignment: CrossAxisAlignment.start,
+          children: [
+            _header(theme, 'What’s your first name?', 'This is how you’ll appear on Woops.'),
+            TextField(
+              key: const Key('onboarding-name'),
+              controller: _name,
+              autofocus: true,
+              maxLength: 40,
+              textCapitalization: TextCapitalization.words,
+              decoration: const InputDecoration(hintText: 'First name'),
+              onChanged: (_) => setState(() {}),
+            ),
+            const SizedBox(height: AppSpacing.sm),
+            Text('Pick a username', style: theme.textTheme.titleMedium),
+            const SizedBox(height: AppSpacing.sm),
+            UsernameField(
+              onChanged: (v, ok) => setState(() {
+                _username = v;
+                _usernameOk = ok;
+              }),
+            ),
+          ],
+        );
+      case _Step.place:
+        final country = countryByCode(_country);
+        return Column(
+          crossAxisAlignment: CrossAxisAlignment.start,
+          children: [
+            _header(
+              theme,
+              'Where are you based?',
+              'Shown on your profile. People anywhere in the world can use Woops.',
+            ),
+            OutlinedButton.icon(
+              onPressed: () async {
+                final c = await showCountryPicker(context, selected: _country);
+                if (c != null) setState(() => _country = c.code);
+              },
+              icon: Text(country?.flag ?? '🌍', style: const TextStyle(fontSize: 20)),
+              label: Text(country?.name ?? 'Choose your country'),
+            ),
+            const SizedBox(height: AppSpacing.md),
+            TextField(
+              controller: _city,
+              maxLength: 80,
+              textCapitalization: TextCapitalization.words,
+              decoration: const InputDecoration(hintText: 'City (optional)'),
+              onChanged: (_) => setState(() {}),
+            ),
+          ],
+        );
+      case _Step.birthday:
+        final age = _birthdate == null ? null : ageFromBirthdate(_birthdate!);
+        return Column(
+          crossAxisAlignment: CrossAxisAlignment.start,
+          children: [
+            _header(theme, 'When’s your birthday?', 'Only your age is shown. You can’t change this later.'),
+            OutlinedButton.icon(
+              onPressed: _birthdateLocked ? null : _pickBirthdate,
+              icon: const Icon(Icons.cake_outlined),
+              label: Text(_birthdate == null ? 'Select date' : DateFormat.yMMMMd().format(_birthdate!)),
+            ),
+            if (_birthdateLocked)
+              Padding(
+                padding: const EdgeInsets.only(top: 8),
+                child: Text('From your sign-up.', style: theme.textTheme.bodySmall),
+              ),
+            if (age != null) ...[
+              const SizedBox(height: AppSpacing.md),
+              Text(
+                age >= _minAge ? 'You’re $age.' : 'Sorry, you must be at least $_minAge to use Woops in your country.',
+                style: theme.textTheme.titleMedium?.copyWith(color: age >= _minAge ? null : theme.colorScheme.error),
+              ),
+            ],
+          ],
+        );
       case _Step.gender:
-        return Column(crossAxisAlignment: CrossAxisAlignment.start, children: [
-          _header(theme, 'How do you identify?'),
-          for (final g in Gender.values)
-            Padding(
-              padding: const EdgeInsets.only(bottom: 10),
-              child: _OptionTile(label: g.label, selected: _gender == g, onTap: () => setState(() => _gender = g)),
-            ),
-        ]);
+        return Column(
+          crossAxisAlignment: CrossAxisAlignment.start,
+          children: [
+            _header(theme, 'How do you identify?'),
+            for (final g in Gender.values)
+              Padding(
+                padding: const EdgeInsets.only(bottom: 10),
+                child: _OptionTile(label: g.label, selected: _gender == g, onTap: () => setState(() => _gender = g)),
+              ),
+          ],
+        );
       case _Step.interestedIn:
-        return Column(crossAxisAlignment: CrossAxisAlignment.start, children: [
-          _header(theme, 'Who would you like to meet?', 'Choose all that apply. You can change this anytime.'),
-          for (final g in Gender.values)
-            Padding(
-              padding: const EdgeInsets.only(bottom: 10),
-              child: _OptionTile(
-                label: g.pluralLabel,
-                selected: _interestedIn.contains(g),
-                multi: true,
-                onTap: () => setState(() {
-                  _interestedIn = {..._interestedIn};
-                  _interestedIn.contains(g) ? _interestedIn.remove(g) : _interestedIn.add(g);
-                }),
+        return Column(
+          crossAxisAlignment: CrossAxisAlignment.start,
+          children: [
+            _header(theme, 'Who would you like to meet?', 'Choose all that apply. You can change this anytime.'),
+            for (final g in Gender.values)
+              Padding(
+                padding: const EdgeInsets.only(bottom: 10),
+                child: _OptionTile(
+                  label: g.pluralLabel,
+                  selected: _interestedIn.contains(g),
+                  multi: true,
+                  onTap: () => setState(() {
+                    _interestedIn = {..._interestedIn};
+                    _interestedIn.contains(g) ? _interestedIn.remove(g) : _interestedIn.add(g);
+                  }),
+                ),
               ),
-            ),
-        ]);
+          ],
+        );
       case _Step.intention:
-        return Column(crossAxisAlignment: CrossAxisAlignment.start, children: [
-          _header(theme, 'What are you looking for?', 'Being upfront helps you find the right people.'),
-          for (final i in Intention.values)
-            Padding(
-              padding: const EdgeInsets.only(bottom: 10),
-              child: _OptionTile(
-                label: '${i.emoji}  ${i.label}',
-                selected: _intention == i,
-                onTap: () => setState(() => _intention = i),
+        return Column(
+          crossAxisAlignment: CrossAxisAlignment.start,
+          children: [
+            _header(theme, 'What are you looking for?', 'Being upfront helps you find the right people.'),
+            for (final i in Intention.values)
+              Padding(
+                padding: const EdgeInsets.only(bottom: 10),
+                child: _OptionTile(
+                  label: '${i.emoji}  ${i.label}',
+                  selected: _intention == i,
+                  onTap: () => setState(() => _intention = i),
+                ),
               ),
-            ),
-        ]);
+          ],
+        );
       case _Step.interests:
-        return Column(crossAxisAlignment: CrossAxisAlignment.start, children: [
-          _header(theme, 'What are you into?', 'Pick up to 10. Shared interests make great openers.'),
-          InterestPicker(selected: _interestIds, onChanged: (s) => setState(() => _interestIds = s)),
-        ]);
+        return Column(
+          crossAxisAlignment: CrossAxisAlignment.start,
+          children: [
+            _header(theme, 'What are you into?', 'Pick up to 10. Shared interests make great openers.'),
+            InterestPicker(selected: _interestIds, onChanged: (s) => setState(() => _interestIds = s)),
+          ],
+        );
       case _Step.photos:
-        return Column(crossAxisAlignment: CrossAxisAlignment.start, children: [
-          _header(theme, 'Add your photos', 'Add at least one. Clear photos of your face work best. '
-              'Photos are compressed and their hidden location data is removed before upload.'),
-          const PhotoGridEditor(),
-        ]);
+        return Column(
+          crossAxisAlignment: CrossAxisAlignment.start,
+          children: [
+            _header(
+              theme,
+              'Add your photos',
+              'Add at least one. Clear photos of your face work best. '
+                  'Photos are compressed and their hidden location data is removed before upload.',
+            ),
+            const PhotoGridEditor(),
+          ],
+        );
       case _Step.about:
-        return Column(crossAxisAlignment: CrossAxisAlignment.start, children: [
-          _header(theme, 'Tell people about you', 'Optional, but profiles with a bio get more matches.'),
-          TextField(
-            controller: _bio,
-            maxLength: 500,
-            minLines: 3,
-            maxLines: 6,
-            textCapitalization: TextCapitalization.sentences,
-            decoration: const InputDecoration(hintText: 'A few lines about you…'),
-            onChanged: (_) => setState(() {}),
-          ),
-          const SectionLabel('Prompts', trailing: 'Optional'),
-          PromptsEditor(prompts: _prompts, onChanged: (p) => setState(() => _prompts = p)),
-        ]);
+        return Column(
+          crossAxisAlignment: CrossAxisAlignment.start,
+          children: [
+            _header(theme, 'Tell people about you', 'Optional, but profiles with a bio get more matches.'),
+            TextField(
+              controller: _bio,
+              maxLength: 500,
+              minLines: 3,
+              maxLines: 6,
+              textCapitalization: TextCapitalization.sentences,
+              decoration: const InputDecoration(hintText: 'A few lines about you…'),
+              onChanged: (_) => setState(() {}),
+            ),
+            const SectionLabel('Prompts', trailing: 'Optional'),
+            PromptsEditor(prompts: _prompts, onChanged: (p) => setState(() => _prompts = p)),
+          ],
+        );
       case _Step.location:
-        return Column(crossAxisAlignment: CrossAxisAlignment.start, children: [
-          _header(theme, 'See people near you'),
-          const _Explainer(icon: Icons.near_me_outlined, text: 'We use your location to show people nearby and how far away they are.'),
-          const _Explainer(icon: Icons.lock_outline_rounded, text: 'Your exact location is never stored or shown. We round it to about 1 km.'),
-          const _Explainer(icon: Icons.public_rounded, text: 'Prefer meeting people anywhere? Choose "Anywhere" in filters.'),
-        ]);
+        return Column(
+          crossAxisAlignment: CrossAxisAlignment.start,
+          children: [
+            _header(theme, 'See people near you'),
+            const _Explainer(
+              icon: Icons.near_me_outlined,
+              text: 'We use your location to show people nearby and how far away they are.',
+            ),
+            const _Explainer(
+              icon: Icons.lock_outline_rounded,
+              text: 'Your exact location is never stored or shown. We round it to about 1 km.',
+            ),
+            const _Explainer(
+              icon: Icons.public_rounded,
+              text: 'Prefer meeting people anywhere? Choose "Anywhere" in filters.',
+            ),
+          ],
+        );
     }
   }
 }

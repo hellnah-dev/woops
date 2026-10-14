@@ -65,10 +65,15 @@ class SimpleMarkdown {
 
     void flush() {
       if (paragraph.isEmpty) return;
-      widgets.add(Padding(
-        padding: const EdgeInsets.only(bottom: 12),
-        child: Text.rich(_inline(paragraph.join(' '), theme.textTheme.bodyLarge!), style: const TextStyle(height: 1.5)),
-      ));
+      widgets.add(
+        Padding(
+          padding: const EdgeInsets.only(bottom: 12),
+          child: Text.rich(
+            _inline(paragraph.join(' '), theme.textTheme.bodyLarge!),
+            style: const TextStyle(height: 1.5),
+          ),
+        ),
+      );
       paragraph.clear();
     }
 
@@ -78,28 +83,39 @@ class SimpleMarkdown {
         flush();
       } else if (line.startsWith('# ')) {
         flush();
-        widgets.add(Padding(
-          padding: const EdgeInsets.only(bottom: 12),
-          child: Text(line.substring(2), style: theme.textTheme.headlineSmall),
-        ));
+        widgets.add(
+          Padding(
+            padding: const EdgeInsets.only(bottom: 12),
+            child: Text(line.substring(2), style: theme.textTheme.headlineSmall),
+          ),
+        );
       } else if (line.startsWith('## ')) {
         flush();
-        widgets.add(Padding(
-          padding: const EdgeInsets.only(top: 12, bottom: 8),
-          child: Text(line.substring(3), style: theme.textTheme.titleLarge),
-        ));
+        widgets.add(
+          Padding(
+            padding: const EdgeInsets.only(top: 12, bottom: 8),
+            child: Text(line.substring(3), style: theme.textTheme.titleLarge),
+          ),
+        );
       } else if (line.startsWith('- ')) {
         flush();
-        widgets.add(Padding(
-          padding: const EdgeInsets.only(bottom: 6, left: 4),
-          child: Row(
-            crossAxisAlignment: CrossAxisAlignment.start,
-            children: [
-              Text('•  ', style: theme.textTheme.bodyLarge),
-              Expanded(child: Text.rich(_inline(line.substring(2), theme.textTheme.bodyLarge!), style: const TextStyle(height: 1.45))),
-            ],
+        widgets.add(
+          Padding(
+            padding: const EdgeInsets.only(bottom: 6, left: 4),
+            child: Row(
+              crossAxisAlignment: CrossAxisAlignment.start,
+              children: [
+                Text('•  ', style: theme.textTheme.bodyLarge),
+                Expanded(
+                  child: Text.rich(
+                    _inline(line.substring(2), theme.textTheme.bodyLarge!),
+                    style: const TextStyle(height: 1.45),
+                  ),
+                ),
+              ],
+            ),
           ),
-        ));
+        );
       } else {
         paragraph.add(line.trim());
       }
@@ -114,7 +130,10 @@ class SimpleMarkdown {
       style: base,
       children: [
         for (var i = 0; i < parts.length; i++)
-          TextSpan(text: parts[i], style: i.isOdd ? const TextStyle(fontWeight: FontWeight.w700) : null),
+          TextSpan(
+            text: parts[i],
+            style: i.isOdd ? const TextStyle(fontWeight: FontWeight.w700) : null,
+          ),
       ],
     );
   }

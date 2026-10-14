@@ -14,10 +14,10 @@ class SwipeResult {
   final String? conversationId;
 
   factory SwipeResult.fromJson(Map<String, dynamic> json) => SwipeResult(
-        matched: json['matched'] as bool? ?? false,
-        matchId: json['match_id'] as String?,
-        conversationId: json['conversation_id'] as String?,
-      );
+    matched: json['matched'] as bool? ?? false,
+    matchId: json['match_id'] as String?,
+    conversationId: json['conversation_id'] as String?,
+  );
 }
 
 /// Abstract so controllers can be unit-tested with a fake.

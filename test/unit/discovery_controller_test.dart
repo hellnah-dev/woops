@@ -13,10 +13,9 @@ void main() {
   late ProviderContainer container;
 
   Future<DiscoveryController> start() async {
-    container = ProviderContainer(overrides: [
-      discoveryRepositoryProvider.overrideWithValue(repo),
-      currentUserIdProvider.overrideWithValue('me'),
-    ]);
+    container = ProviderContainer(
+      overrides: [discoveryRepositoryProvider.overrideWithValue(repo), currentUserIdProvider.overrideWithValue('me')],
+    );
     addTearDown(container.dispose);
     container.listen(discoveryControllerProvider, (_, _) {});
     await pumpEventQueue();

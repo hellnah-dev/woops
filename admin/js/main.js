@@ -39,8 +39,10 @@ async function showApp(session) {
   let isAdmin = false;
   try { isAdmin = await rpc('is_admin'); } catch { /* not allowed */ }
   if (!isAdmin) {
+    const email = session.user.email;
     await supabase.auth.signOut();
-    showLogin('This account is not an admin.');
+    showLogin('');
+    showNotAdminHelp(email);
     return;
   }
   $('#login').classList.add('hidden');
@@ -49,6 +51,19 @@ async function showApp(session) {
   startRealtime();
   window.addEventListener('hashchange', route);
   route();
+}
+
+function showNotAdminHelp(email) {
+  const sql = `insert into public.admins (user_id)\nselect id from auth.users where email = '${email.replaceAll("'", "''")}';`;
+  $('#login-error').innerHTML = `
+    <strong>${esc(email)} isn't an admin yet.</strong><br>
+    In Supabase → <b>SQL Editor</b> → <b>New query</b>, paste this and click <b>Run</b>, then sign in again:
+    <pre class="stack">${esc(sql)}</pre>
+    <button type="button" class="btn small" id="copy-sql">Copy SQL</button>`;
+  $('#copy-sql').onclick = async () => {
+    await navigator.clipboard.writeText(sql);
+    $('#copy-sql').textContent = 'Copied ✓';
+  };
 }
 
 function showLogin(message = '') {

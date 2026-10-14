@@ -4,13 +4,7 @@ import '../theme/app_colors.dart';
 
 /// Full-width primary action with a brand gradient and built-in loading state.
 class PrimaryButton extends StatelessWidget {
-  const PrimaryButton({
-    super.key,
-    required this.label,
-    required this.onPressed,
-    this.loading = false,
-    this.icon,
-  });
+  const PrimaryButton({super.key, required this.label, required this.onPressed, this.loading = false, this.icon});
 
   final String label;
   final VoidCallback? onPressed;
@@ -56,10 +50,9 @@ class PrimaryButton extends StatelessWidget {
                             if (icon != null) ...[Icon(icon, color: Colors.white), const SizedBox(width: 8)],
                             Text(
                               label,
-                              style: Theme.of(context)
-                                  .textTheme
-                                  .labelLarge
-                                  ?.copyWith(color: Colors.white, fontSize: 16),
+                              style: Theme.of(
+                                context,
+                              ).textTheme.labelLarge?.copyWith(color: Colors.white, fontSize: 16),
                             ),
                           ],
                         ),

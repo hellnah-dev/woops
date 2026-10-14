@@ -50,7 +50,10 @@ class _BannerAdSlotState extends ConsumerState<BannerAdSlot> {
     final unit = AdsConfig.bannerUnitId;
     if (_requested || unit == null) return;
     _requested = true;
-    final size = await AdSize.getLargeAnchoredAdaptiveBannerAdSizeWithOrientation(Orientation.portrait, width.truncate());
+    final size = await AdSize.getLargeAnchoredAdaptiveBannerAdSizeWithOrientation(
+      Orientation.portrait,
+      width.truncate(),
+    );
     if (size == null || !mounted) return;
     _ad = BannerAd(
       adUnitId: unit,
@@ -76,21 +79,27 @@ class _BannerAdSlotState extends ConsumerState<BannerAdSlot> {
   Widget build(BuildContext context) {
     final ready = ref.watch(adsReadyProvider);
     if (!ready || !AdsConfig.bannersEnabled) return const SizedBox.shrink();
-    return LayoutBuilder(builder: (context, constraints) {
-      _load(constraints.maxWidth);
-      final ad = _ad;
-      if (!_loaded || ad == null) return const SizedBox.shrink();
-      return SafeArea(
-        top: false,
-        child: Column(
-          mainAxisSize: MainAxisSize.min,
-          children: [
-            const _SponsoredLabel(),
-            SizedBox(width: ad.size.width.toDouble(), height: ad.size.height.toDouble(), child: AdWidget(ad: ad)),
-          ],
-        ),
-      );
-    });
+    return LayoutBuilder(
+      builder: (context, constraints) {
+        _load(constraints.maxWidth);
+        final ad = _ad;
+        if (!_loaded || ad == null) return const SizedBox.shrink();
+        return SafeArea(
+          top: false,
+          child: Column(
+            mainAxisSize: MainAxisSize.min,
+            children: [
+              const _SponsoredLabel(),
+              SizedBox(
+                width: ad.size.width.toDouble(),
+                height: ad.size.height.toDouble(),
+                child: AdWidget(ad: ad),
+              ),
+            ],
+          ),
+        );
+      },
+    );
   }
 }
 

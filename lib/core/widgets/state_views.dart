@@ -43,14 +43,7 @@ class ErrorView extends StatelessWidget {
 }
 
 class EmptyState extends StatelessWidget {
-  const EmptyState({
-    super.key,
-    required this.icon,
-    required this.title,
-    this.message,
-    this.actionLabel,
-    this.onAction,
-  });
+  const EmptyState({super.key, required this.icon, required this.title, this.message, this.actionLabel, this.onAction});
 
   final IconData icon;
   final String title;
@@ -107,8 +100,7 @@ void showSnack(BuildContext context, Object messageOrError, {bool isError = fals
   final scheme = Theme.of(context).colorScheme;
   ScaffoldMessenger.of(context)
     ..hideCurrentSnackBar()
-    ..showSnackBar(SnackBar(
-      content: Text(text),
-      backgroundColor: isError || messageOrError is! String ? scheme.error : null,
-    ));
+    ..showSnackBar(
+      SnackBar(content: Text(text), backgroundColor: isError || messageOrError is! String ? scheme.error : null),
+    );
 }

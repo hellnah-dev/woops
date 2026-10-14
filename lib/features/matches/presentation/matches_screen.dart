@@ -40,16 +40,18 @@ class MatchesScreen extends ConsumerWidget {
           if (all.isEmpty) {
             return RefreshIndicator(
               onRefresh: () => ref.read(inboxProvider.notifier).refresh(),
-              child: ListView(children: [
-                const SizedBox(height: 80),
-                EmptyState(
-                  icon: Icons.people_outline_rounded,
-                  title: 'No matches yet',
-                  message: 'When you and someone else like each other, you’ll match and can start chatting.',
-                  actionLabel: 'Start discovering',
-                  onAction: () => context.go(Routes.discover),
-                ),
-              ]),
+              child: ListView(
+                children: [
+                  const SizedBox(height: 80),
+                  EmptyState(
+                    icon: Icons.people_outline_rounded,
+                    title: 'No matches yet',
+                    message: 'When you and someone else like each other, you’ll match and can start chatting.',
+                    actionLabel: 'Start discovering',
+                    onAction: () => context.go(Routes.discover),
+                  ),
+                ],
+              ),
             );
           }
           final fresh = all.where((c) => !c.hasMessages).toList()..sort((a, b) => b.matchedAt.compareTo(a.matchedAt));
@@ -63,10 +65,7 @@ class MatchesScreen extends ConsumerWidget {
                   _header(context, 'New matches', 'Say hi. They’re waiting!'),
                   _grid(fresh, isNew: true),
                 ],
-                if (talking.isNotEmpty) ...[
-                  _header(context, 'In conversation', null),
-                  _grid(talking, isNew: false),
-                ],
+                if (talking.isNotEmpty) ...[_header(context, 'In conversation', null), _grid(talking, isNew: false)],
                 const SliverToBoxAdapter(child: SizedBox(height: AppSpacing.lg)),
               ],
             ),
@@ -94,18 +93,18 @@ class MatchesScreen extends ConsumerWidget {
   }
 
   Widget _grid(List<ConversationSummary> items, {required bool isNew}) => SliverPadding(
-        padding: const EdgeInsets.symmetric(horizontal: AppSpacing.md),
-        sliver: SliverGrid.builder(
-          itemCount: items.length,
-          gridDelegate: const SliverGridDelegateWithMaxCrossAxisExtent(
-            maxCrossAxisExtent: 180,
-            mainAxisSpacing: 12,
-            crossAxisSpacing: 12,
-            childAspectRatio: 0.72,
-          ),
-          itemBuilder: (context, i) => _MatchTile(summary: items[i], isNew: isNew),
-        ),
-      );
+    padding: const EdgeInsets.symmetric(horizontal: AppSpacing.md),
+    sliver: SliverGrid.builder(
+      itemCount: items.length,
+      gridDelegate: const SliverGridDelegateWithMaxCrossAxisExtent(
+        maxCrossAxisExtent: 180,
+        mainAxisSpacing: 12,
+        crossAxisSpacing: 12,
+        childAspectRatio: 0.72,
+      ),
+      itemBuilder: (context, i) => _MatchTile(summary: items[i], isNew: isNew),
+    ),
+  );
 }
 
 class _MatchTile extends StatelessWidget {

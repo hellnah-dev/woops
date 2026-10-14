@@ -41,11 +41,7 @@ class SupabaseChatRepository implements ChatRepository {
 
   @override
   Future<List<ChatMessage>> fetchMessages(String conversationId, {DateTime? before, int limit = 30}) async {
-    var query = _client
-        .from('messages')
-        .select()
-        .eq('conversation_id', conversationId)
-        .isFilter('deleted_at', null);
+    var query = _client.from('messages').select().eq('conversation_id', conversationId).isFilter('deleted_at', null);
     if (before != null) query = query.lt('created_at', before.toUtc().toIso8601String());
     final rows = await query.order('created_at', ascending: false).order('id', ascending: false).limit(limit);
     return rows.map(ChatMessage.fromJson).toList();
@@ -53,11 +49,10 @@ class SupabaseChatRepository implements ChatRepository {
 
   @override
   Future<ChatMessage> sendMessage(String conversationId, String body, {required String clientId}) async {
-    final row = await _client.rpc('send_message', params: {
-      'p_conversation_id': conversationId,
-      'p_body': body,
-      'p_client_id': clientId,
-    });
+    final row = await _client.rpc(
+      'send_message',
+      params: {'p_conversation_id': conversationId, 'p_body': body, 'p_client_id': clientId},
+    );
     return ChatMessage.fromJson(Map<String, dynamic>.from(row as Map));
   }
 

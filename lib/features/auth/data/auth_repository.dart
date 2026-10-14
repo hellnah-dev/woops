@@ -27,10 +27,7 @@ class AuthRepository {
       email: email.trim(),
       password: password,
       emailRedirectTo: Env.authRedirectUrl,
-      data: {
-        'birthdate': DateFormat('yyyy-MM-dd').format(birthdate),
-        'country_code': countryCode,
-      },
+      data: {'birthdate': DateFormat('yyyy-MM-dd').format(birthdate), 'country_code': countryCode},
     );
     return res.session != null;
   }
@@ -54,8 +51,7 @@ class AuthRepository {
 
   Future<bool> hasAcceptedLegal() async => await _client.rpc('has_accepted_legal') as bool;
 
-  Future<void> acceptLegal(String version) =>
-      _client.rpc('accept_legal_documents', params: {'p_version': version});
+  Future<void> acceptLegal(String version) => _client.rpc('accept_legal_documents', params: {'p_version': version});
 
   Future<void> signIn({required String email, required String password}) =>
       _auth.signInWithPassword(email: email.trim(), password: password);
@@ -63,10 +59,10 @@ class AuthRepository {
   /// Opens the provider's sign-in page in the browser; the app receives the
   /// session through the [Env.authRedirectUrl] deep link.
   Future<void> signInWithProvider(OAuthProvider provider) => _auth.signInWithOAuth(
-        provider,
-        redirectTo: Env.authRedirectUrl,
-        authScreenLaunchMode: LaunchMode.externalApplication,
-      );
+    provider,
+    redirectTo: Env.authRedirectUrl,
+    authScreenLaunchMode: LaunchMode.externalApplication,
+  );
 
   Future<void> sendPasswordReset(String email) =>
       _auth.resetPasswordForEmail(email.trim(), redirectTo: Env.authRedirectUrl);
@@ -76,6 +72,4 @@ class AuthRepository {
   Future<void> signOut() => _auth.signOut();
 }
 
-final authRepositoryProvider = Provider<AuthRepository>(
-  (ref) => AuthRepository(ref.watch(supabaseClientProvider)),
-);
+final authRepositoryProvider = Provider<AuthRepository>((ref) => AuthRepository(ref.watch(supabaseClientProvider)));

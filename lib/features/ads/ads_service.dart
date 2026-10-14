@@ -33,10 +33,12 @@ class AdsController extends Notifier<bool> {
       if (Platform.isIOS && await AppTrackingTransparency.trackingAuthorizationStatus == TrackingStatus.notDetermined) {
         await AppTrackingTransparency.requestTrackingAuthorization();
       }
-      await MobileAds.instance.updateRequestConfiguration(RequestConfiguration(
-        // Keep ads tasteful in a dating app: no mature-rated ads.
-        maxAdContentRating: MaxAdContentRating.t,
-      ));
+      await MobileAds.instance.updateRequestConfiguration(
+        RequestConfiguration(
+          // Keep ads tasteful in a dating app: no mature-rated ads.
+          maxAdContentRating: MaxAdContentRating.t,
+        ),
+      );
       await MobileAds.instance.initialize();
       state = true;
     } catch (e) {

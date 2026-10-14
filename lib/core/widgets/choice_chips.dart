@@ -34,9 +34,7 @@ class ChoiceChipGroup<T> extends StatelessWidget {
             selected: selected.contains(option),
             selectedColor: scheme.primary.withValues(alpha: 0.15),
             side: BorderSide(color: selected.contains(option) ? scheme.primary : scheme.outlineVariant),
-            label: Text(
-              [if (leadingOf?.call(option) != null) leadingOf!(option)!, labelOf(option)].join(' '),
-            ),
+            label: Text([if (leadingOf?.call(option) != null) leadingOf!(option)!, labelOf(option)].join(' ')),
             onSelected: (isSelected) {
               final next = {...selected};
               if (!multiSelect) {

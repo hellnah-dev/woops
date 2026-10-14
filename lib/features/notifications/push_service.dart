@@ -111,10 +111,10 @@ class PushService {
     }
   }
 
-  Future<void> _register(String token) => _client.rpc('register_device_token', params: {
-        'p_token': token,
-        'p_platform': Platform.isIOS ? 'ios' : 'android',
-      });
+  Future<void> _register(String token) => _client.rpc(
+    'register_device_token',
+    params: {'p_token': token, 'p_platform': Platform.isIOS ? 'ios' : 'android'},
+  );
 
   /// Call before signing out so this device stops receiving the user's pushes.
   Future<void> unregister() async {
@@ -138,10 +138,12 @@ class PushService {
       final title = message.notification?.title;
       final body = message.notification?.body;
       if (title == null && body == null) return;
-      scaffoldMessengerKey.currentState?.showSnackBar(SnackBar(
-        content: Text([title, body].whereType<String>().join(': ')),
-        action: SnackBarAction(label: 'Open', onPressed: () => _open(message)),
-      ));
+      scaffoldMessengerKey.currentState?.showSnackBar(
+        SnackBar(
+          content: Text([title, body].whereType<String>().join(': ')),
+          action: SnackBarAction(label: 'Open', onPressed: () => _open(message)),
+        ),
+      );
     });
     FirebaseMessaging.onMessageOpenedApp.listen(_open);
     FirebaseMessaging.instance.getInitialMessage().then((m) {

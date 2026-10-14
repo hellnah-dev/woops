@@ -22,15 +22,11 @@ class PhotoUrlResolver {
   const PhotoUrlResolver(this._client);
   final SupabaseClient _client;
 
-  String url(String storagePath) =>
-      '${Env.supabaseUrl}/storage/v1/object/authenticated/profile-photos/$storagePath';
+  String url(String storagePath) => '${Env.supabaseUrl}/storage/v1/object/authenticated/profile-photos/$storagePath';
 
   Map<String, String> get headers {
     final token = _client.auth.currentSession?.accessToken;
-    return {
-      'apikey': Env.supabasePublishableKey,
-      if (token != null) 'Authorization': 'Bearer $token',
-    };
+    return {'apikey': Env.supabasePublishableKey, if (token != null) 'Authorization': 'Bearer $token'};
   }
 }
 

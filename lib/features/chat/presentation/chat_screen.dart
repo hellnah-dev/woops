@@ -28,7 +28,10 @@ class ChatScreen extends ConsumerWidget {
     final inbox = ref.watch(inboxProvider);
     return inbox.when(
       loading: () => const Scaffold(body: LoadingView()),
-      error: (e, _) => Scaffold(appBar: AppBar(), body: ErrorView(error: e, onRetry: () => ref.invalidate(inboxProvider))),
+      error: (e, _) => Scaffold(
+        appBar: AppBar(),
+        body: ErrorView(error: e, onRetry: () => ref.invalidate(inboxProvider)),
+      ),
       data: (all) {
         final match = all.where((c) => c.conversationId == conversationId).firstOrNull;
         if (match == null) {
@@ -220,59 +223,64 @@ class _ChatViewState extends ConsumerState<_ChatView> {
         child: Column(
           children: [
             Expanded(
-              child: Builder(builder: (context) {
-                if (state.isLoading && state.messages.isEmpty) return const LoadingView();
-                if (state.error != null && state.messages.isEmpty) {
-                  return ErrorView(error: state.error!, onRetry: controller.retryInitial);
-                }
-                if (state.messages.isEmpty) {
-                  return EmptyState(
-                    icon: Icons.waving_hand_outlined,
-                    title: 'Say hi to ${widget.args.otherName}',
-                    message: 'Ask about something on their profile. Good openers are specific.',
-                  );
-                }
-                return ListView.builder(
-                  controller: _scroll,
-                  reverse: true,
-                  padding: const EdgeInsets.symmetric(horizontal: AppSpacing.md, vertical: AppSpacing.sm),
-                  itemCount: state.messages.length + (state.isLoadingMore ? 1 : 0),
-                  itemBuilder: (context, i) {
-                    if (i == state.messages.length) {
-                      return const Padding(
-                        padding: EdgeInsets.all(12),
-                        child: Center(child: SizedBox(width: 22, height: 22, child: CircularProgressIndicator(strokeWidth: 2))),
-                      );
-                    }
-                    final m = state.messages[i];
-                    final older = i + 1 < state.messages.length ? state.messages[i + 1] : null;
-                    final showDay = older == null || dayLabel(older.createdAt) != dayLabel(m.createdAt);
-                    final mine = m.senderId == myId;
-                    final isRead = mine &&
-                        m.id == lastMine?.id &&
-                        state.otherReadAt != null &&
-                        !state.otherReadAt!.isBefore(m.createdAt);
-                    return Column(
-                      children: [
-                        if (showDay)
-                          Padding(
-                            padding: const EdgeInsets.symmetric(vertical: 12),
-                            child: Text(dayLabel(m.createdAt), style: theme.textTheme.labelMedium),
-                          ),
-                        _Bubble(
-                          message: m,
-                          mine: mine,
-                          showStatus: mine && (m.id == lastMine?.id || m.delivery != DeliveryState.sent),
-                          isRead: isRead,
-                          onRetry: () => controller.retry(m),
-                          onDiscard: () => controller.discardFailed(m),
-                          onLongPress: m.delivery == DeliveryState.sent ? () => _messageActions(m, mine) : null,
-                        ),
-                      ],
+              child: Builder(
+                builder: (context) {
+                  if (state.isLoading && state.messages.isEmpty) return const LoadingView();
+                  if (state.error != null && state.messages.isEmpty) {
+                    return ErrorView(error: state.error!, onRetry: controller.retryInitial);
+                  }
+                  if (state.messages.isEmpty) {
+                    return EmptyState(
+                      icon: Icons.waving_hand_outlined,
+                      title: 'Say hi to ${widget.args.otherName}',
+                      message: 'Ask about something on their profile. Good openers are specific.',
                     );
-                  },
-                );
-              }),
+                  }
+                  return ListView.builder(
+                    controller: _scroll,
+                    reverse: true,
+                    padding: const EdgeInsets.symmetric(horizontal: AppSpacing.md, vertical: AppSpacing.sm),
+                    itemCount: state.messages.length + (state.isLoadingMore ? 1 : 0),
+                    itemBuilder: (context, i) {
+                      if (i == state.messages.length) {
+                        return const Padding(
+                          padding: EdgeInsets.all(12),
+                          child: Center(
+                            child: SizedBox(width: 22, height: 22, child: CircularProgressIndicator(strokeWidth: 2)),
+                          ),
+                        );
+                      }
+                      final m = state.messages[i];
+                      final older = i + 1 < state.messages.length ? state.messages[i + 1] : null;
+                      final showDay = older == null || dayLabel(older.createdAt) != dayLabel(m.createdAt);
+                      final mine = m.senderId == myId;
+                      final isRead =
+                          mine &&
+                          m.id == lastMine?.id &&
+                          state.otherReadAt != null &&
+                          !state.otherReadAt!.isBefore(m.createdAt);
+                      return Column(
+                        children: [
+                          if (showDay)
+                            Padding(
+                              padding: const EdgeInsets.symmetric(vertical: 12),
+                              child: Text(dayLabel(m.createdAt), style: theme.textTheme.labelMedium),
+                            ),
+                          _Bubble(
+                            message: m,
+                            mine: mine,
+                            showStatus: mine && (m.id == lastMine?.id || m.delivery != DeliveryState.sent),
+                            isRead: isRead,
+                            onRetry: () => controller.retry(m),
+                            onDiscard: () => controller.discardFailed(m),
+                            onLongPress: m.delivery == DeliveryState.sent ? () => _messageActions(m, mine) : null,
+                          ),
+                        ],
+                      );
+                    },
+                  );
+                },
+              ),
             ),
             _Composer(controller: _input, onSend: _send, onChanged: () => setState(() {})),
           ],

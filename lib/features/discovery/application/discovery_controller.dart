@@ -35,14 +35,13 @@ class DiscoveryState {
     bool? exhausted,
     ProfileCard? lastPassed,
     bool clearLastPassed = false,
-  }) =>
-      DiscoveryState(
-        queue: queue ?? this.queue,
-        isLoading: isLoading ?? this.isLoading,
-        error: clearError ? null : (error ?? this.error),
-        exhausted: exhausted ?? this.exhausted,
-        lastPassed: clearLastPassed ? null : (lastPassed ?? this.lastPassed),
-      );
+  }) => DiscoveryState(
+    queue: queue ?? this.queue,
+    isLoading: isLoading ?? this.isLoading,
+    error: clearError ? null : (error ?? this.error),
+    exhausted: exhausted ?? this.exhausted,
+    lastPassed: clearLastPassed ? null : (lastPassed ?? this.lastPassed),
+  );
 }
 
 class DiscoveryController extends Notifier<DiscoveryState> {
@@ -79,11 +78,7 @@ class DiscoveryController extends Notifier<DiscoveryState> {
       final page = await _repo.fetchFeed(limit: pageSize);
       final known = {...state.queue.map((c) => c.id), ..._inFlight};
       final fresh = page.where((c) => !known.contains(c.id)).toList();
-      state = state.copyWith(
-        queue: [...state.queue, ...fresh],
-        isLoading: false,
-        exhausted: page.length < pageSize,
-      );
+      state = state.copyWith(queue: [...state.queue, ...fresh], isLoading: false, exhausted: page.length < pageSize);
     } catch (e) {
       state = state.copyWith(isLoading: false, error: AppException.from(e));
     } finally {
@@ -101,9 +96,7 @@ class DiscoveryController extends Notifier<DiscoveryState> {
 
     try {
       final result = await _repo.swipe(card.id, action);
-      state = action == SwipeAction.pass
-          ? state.copyWith(lastPassed: card)
-          : state.copyWith(clearLastPassed: true);
+      state = action == SwipeAction.pass ? state.copyWith(lastPassed: card) : state.copyWith(clearLastPassed: true);
       return result;
     } catch (e) {
       final error = AppException.from(e);
@@ -141,8 +134,7 @@ class DiscoveryController extends Notifier<DiscoveryState> {
   }
 }
 
-final discoveryControllerProvider =
-    NotifierProvider<DiscoveryController, DiscoveryState>(DiscoveryController.new);
+final discoveryControllerProvider = NotifierProvider<DiscoveryController, DiscoveryState>(DiscoveryController.new);
 
 /// People who liked me (newest first).
 final likesReceivedProvider = FutureProvider.autoDispose<List<ProfileCard>>((ref) {

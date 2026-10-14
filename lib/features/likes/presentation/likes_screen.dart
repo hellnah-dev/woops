@@ -44,15 +44,18 @@ class LikesScreen extends ConsumerWidget {
         data: (cards) => RefreshIndicator(
           onRefresh: () => ref.refresh(likesReceivedProvider.future),
           child: cards.isEmpty
-              ? ListView(children: const [
-                  SizedBox(height: 80),
-                  EmptyState(
-                    icon: Icons.favorite_border_rounded,
-                    title: 'No likes yet',
-                    message: 'When someone likes you, they’ll show up here. '
-                        'A complete profile with a few great photos helps.',
-                  ),
-                ])
+              ? ListView(
+                  children: const [
+                    SizedBox(height: 80),
+                    EmptyState(
+                      icon: Icons.favorite_border_rounded,
+                      title: 'No likes yet',
+                      message:
+                          'When someone likes you, they’ll show up here. '
+                          'A complete profile with a few great photos helps.',
+                    ),
+                  ],
+                )
               : CustomScrollView(
                   slivers: [
                     SliverPadding(
@@ -75,7 +78,8 @@ class LikesScreen extends ConsumerWidget {
                           crossAxisSpacing: 12,
                           childAspectRatio: 0.72,
                         ),
-                        itemBuilder: (context, i) => _LikeTile(card: cards[i], onTap: () => _open(context, ref, cards[i])),
+                        itemBuilder: (context, i) =>
+                            _LikeTile(card: cards[i], onTap: () => _open(context, ref, cards[i])),
                       ),
                     ),
                   ],

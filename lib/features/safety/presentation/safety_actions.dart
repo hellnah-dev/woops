@@ -14,13 +14,20 @@ void _afterSafetyAction(WidgetRef ref) {
 }
 
 /// Confirms, then blocks. Returns true if the user was blocked.
-Future<bool> confirmAndBlock(BuildContext context, WidgetRef ref, {required String userId, required String name}) async {
+Future<bool> confirmAndBlock(
+  BuildContext context,
+  WidgetRef ref, {
+  required String userId,
+  required String name,
+}) async {
   final ok = await showDialog<bool>(
     context: context,
     builder: (context) => AlertDialog(
       title: Text('Block $name?'),
-      content: Text('$name won’t be able to see your profile or message you, and you’ll be unmatched. '
-          'They won’t be told that you blocked them.'),
+      content: Text(
+        '$name won’t be able to see your profile or message you, and you’ll be unmatched. '
+        'They won’t be told that you blocked them.',
+      ),
       actions: [
         TextButton(onPressed: () => Navigator.pop(context, false), child: const Text('Cancel')),
         TextButton(
@@ -90,8 +97,12 @@ class _ReportSheetState extends ConsumerState<_ReportSheet> {
     setState(() => _sending = true);
     final repo = ref.read(safetyRepositoryProvider);
     try {
-      await repo.report(widget.userId, reason,
-          details: _details.text.trim().isEmpty ? null : _details.text.trim(), messageId: widget.messageId);
+      await repo.report(
+        widget.userId,
+        reason,
+        details: _details.text.trim().isEmpty ? null : _details.text.trim(),
+        messageId: widget.messageId,
+      );
       if (_alsoBlock) await repo.block(widget.userId);
       if (!mounted) return;
       showSnack(context, 'Thanks for letting us know. Our team will review this report.');
@@ -126,11 +137,7 @@ class _ReportSheetState extends ConsumerState<_ReportSheet> {
               child: Column(
                 children: [
                   for (final r in ReportReason.values)
-                    RadioListTile<ReportReason>(
-                      value: r,
-                      contentPadding: EdgeInsets.zero,
-                      title: Text(r.label),
-                    ),
+                    RadioListTile<ReportReason>(value: r, contentPadding: EdgeInsets.zero, title: Text(r.label)),
                 ],
               ),
             ),

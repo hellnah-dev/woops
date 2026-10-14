@@ -17,7 +17,8 @@ class SettingsRepository {
       _client.from('privacy_settings').update(s.toJson()).eq('user_id', _uid);
 
   Future<NotificationPreferences> fetchNotifications() async => NotificationPreferences.fromJson(
-      await _client.from('notification_preferences').select().eq('user_id', _uid).single());
+    await _client.from('notification_preferences').select().eq('user_id', _uid).single(),
+  );
 
   Future<void> saveNotifications(NotificationPreferences p) =>
       _client.from('notification_preferences').update(p.toJson()).eq('user_id', _uid);

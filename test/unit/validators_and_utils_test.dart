@@ -54,7 +54,9 @@ void main() {
     });
 
     test('does not leak raw database errors', () {
-      final e = AppException.from(const PostgrestException(message: 'duplicate key value violates unique constraint "x"'));
+      final e = AppException.from(
+        const PostgrestException(message: 'duplicate key value violates unique constraint "x"'),
+      );
       expect(e.message, 'Something went wrong. Please try again.');
     });
 

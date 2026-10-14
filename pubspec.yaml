@@ -49,6 +49,9 @@ dependencies:
   firebase_messaging: ^16.7.0
   google_mobile_ads: ^9.1.0
   app_tracking_transparency: ^2.0.7
+  image_cropper: ^12.2.1
+  permission_handler: ^12.0.1
+  package_info_plus: ^10.2.2
 
 dev_dependencies:
   flutter_test:
@@ -77,6 +80,24 @@ flutter:
 
   assets:
     - assets/branding/
+    - assets/legal/
+    - assets/fonts/OFL-Nunito.txt
+    - assets/fonts/OFL-Pacifico.txt
+
+  # Bundled fonts (SIL Open Font License, see assets/fonts/OFL-*.txt)
+  fonts:
+    - family: Nunito
+      fonts:
+        - asset: assets/fonts/Nunito-Regular.ttf
+        - asset: assets/fonts/Nunito-SemiBold.ttf
+          weight: 600
+        - asset: assets/fonts/Nunito-Bold.ttf
+          weight: 700
+        - asset: assets/fonts/Nunito-ExtraBold.ttf
+          weight: 800
+    - family: Pacifico
+      fonts:
+        - asset: assets/fonts/Pacifico-Regular.ttf
 
   # To add assets to your application, add an assets section, like this:
   # assets:

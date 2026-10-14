@@ -35,27 +35,27 @@ class ChatMessage {
   final DeliveryState delivery;
 
   factory ChatMessage.fromJson(Map<String, dynamic> json) => ChatMessage(
-        id: json['id'] as String,
-        conversationId: json['conversation_id'] as String,
-        senderId: json['sender_id'] as String,
-        clientId: json['client_id'] as String,
-        kind: MessageKind.fromValue(json['kind'] as String?),
-        body: json['body'] as String?,
-        mediaPath: json['media_path'] as String?,
-        createdAt: DateTime.parse(json['created_at'] as String),
-      );
+    id: json['id'] as String,
+    conversationId: json['conversation_id'] as String,
+    senderId: json['sender_id'] as String,
+    clientId: json['client_id'] as String,
+    kind: MessageKind.fromValue(json['kind'] as String?),
+    body: json['body'] as String?,
+    mediaPath: json['media_path'] as String?,
+    createdAt: DateTime.parse(json['created_at'] as String),
+  );
 
   ChatMessage copyWith({DeliveryState? delivery}) => ChatMessage(
-        id: id,
-        conversationId: conversationId,
-        senderId: senderId,
-        clientId: clientId,
-        kind: kind,
-        body: body,
-        mediaPath: mediaPath,
-        createdAt: createdAt,
-        delivery: delivery ?? this.delivery,
-      );
+    id: id,
+    conversationId: conversationId,
+    senderId: senderId,
+    clientId: clientId,
+    kind: kind,
+    body: body,
+    mediaPath: mediaPath,
+    createdAt: createdAt,
+    delivery: delivery ?? this.delivery,
+  );
 }
 
 /// Merges [incoming] messages into [existing] (both newest-first), replacing
@@ -119,17 +119,18 @@ class ConversationSummary {
   }
 
   factory ConversationSummary.fromJson(Map<String, dynamic> json) => ConversationSummary(
-        matchId: json['match_id'] as String,
-        conversationId: json['conversation_id'] as String,
-        matchedAt: DateTime.parse(json['matched_at'] as String),
-        otherUserId: json['other_user_id'] as String,
-        otherDisplayName: json['other_display_name'] as String,
-        otherPhoto: json['other_photo'] as String?,
-        lastMessageBody: json['last_message_body'] as String?,
-        lastMessageKind:
-            json['last_message_kind'] == null ? null : MessageKind.fromValue(json['last_message_kind'] as String),
-        lastMessageSenderId: json['last_message_sender_id'] as String?,
-        lastMessageAt: json['last_message_at'] == null ? null : DateTime.parse(json['last_message_at'] as String),
-        unreadCount: (json['unread_count'] as num?)?.toInt() ?? 0,
-      );
+    matchId: json['match_id'] as String,
+    conversationId: json['conversation_id'] as String,
+    matchedAt: DateTime.parse(json['matched_at'] as String),
+    otherUserId: json['other_user_id'] as String,
+    otherDisplayName: json['other_display_name'] as String,
+    otherPhoto: json['other_photo'] as String?,
+    lastMessageBody: json['last_message_body'] as String?,
+    lastMessageKind: json['last_message_kind'] == null
+        ? null
+        : MessageKind.fromValue(json['last_message_kind'] as String),
+    lastMessageSenderId: json['last_message_sender_id'] as String?,
+    lastMessageAt: json['last_message_at'] == null ? null : DateTime.parse(json['last_message_at'] as String),
+    unreadCount: (json['unread_count'] as num?)?.toInt() ?? 0,
+  );
 }

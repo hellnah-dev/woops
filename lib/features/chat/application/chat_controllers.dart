@@ -103,15 +103,14 @@ class ChatState {
     AppException? error,
     bool clearError = false,
     DateTime? otherReadAt,
-  }) =>
-      ChatState(
-        messages: messages ?? this.messages,
-        isLoading: isLoading ?? this.isLoading,
-        isLoadingMore: isLoadingMore ?? this.isLoadingMore,
-        hasMore: hasMore ?? this.hasMore,
-        error: clearError ? null : (error ?? this.error),
-        otherReadAt: otherReadAt ?? this.otherReadAt,
-      );
+  }) => ChatState(
+    messages: messages ?? this.messages,
+    isLoading: isLoading ?? this.isLoading,
+    isLoadingMore: isLoadingMore ?? this.isLoadingMore,
+    hasMore: hasMore ?? this.hasMore,
+    error: clearError ? null : (error ?? this.error),
+    otherReadAt: otherReadAt ?? this.otherReadAt,
+  );
 }
 
 class ChatController extends AutoDisposeFamilyNotifier<ChatState, ChatArgs> {
@@ -226,7 +225,8 @@ class ChatController extends AutoDisposeFamilyNotifier<ChatState, ChatArgs> {
     } catch (e) {
       state = state.copyWith(
         messages: [
-          for (final m in state.messages) m.clientId == id && m.delivery != DeliveryState.sent ? m.copyWith(delivery: DeliveryState.failed) : m,
+          for (final m in state.messages)
+            m.clientId == id && m.delivery != DeliveryState.sent ? m.copyWith(delivery: DeliveryState.failed) : m,
         ],
         error: AppException.from(e),
       );
@@ -240,5 +240,6 @@ class ChatController extends AutoDisposeFamilyNotifier<ChatState, ChatArgs> {
   }
 }
 
-final chatControllerProvider =
-    NotifierProvider.autoDispose.family<ChatController, ChatState, ChatArgs>(ChatController.new);
+final chatControllerProvider = NotifierProvider.autoDispose.family<ChatController, ChatState, ChatArgs>(
+  ChatController.new,
+);

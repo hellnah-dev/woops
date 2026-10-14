@@ -1,3 +1,4 @@
+import '../../../core/astro/zodiac.dart';
 import 'profile_enums.dart';
 
 class ProfilePrompt {
@@ -9,11 +10,11 @@ class ProfilePrompt {
   final int position;
 
   factory ProfilePrompt.fromJson(Map<String, dynamic> json) => ProfilePrompt(
-        id: json['id'] as String?,
-        prompt: json['prompt'] as String,
-        answer: json['answer'] as String,
-        position: (json['position'] as num?)?.toInt() ?? 0,
-      );
+    id: json['id'] as String?,
+    prompt: json['prompt'] as String,
+    answer: json['answer'] as String,
+    position: (json['position'] as num?)?.toInt() ?? 0,
+  );
 }
 
 class Interest {
@@ -25,11 +26,11 @@ class Interest {
   final String category;
 
   factory Interest.fromJson(Map<String, dynamic> json) => Interest(
-        id: (json['id'] as num).toInt(),
-        name: json['name'] as String,
-        emoji: json['emoji'] as String?,
-        category: json['category'] as String? ?? 'general',
-      );
+    id: (json['id'] as num).toInt(),
+    name: json['name'] as String,
+    emoji: json['emoji'] as String?,
+    category: json['category'] as String? ?? 'general',
+  );
 
   @override
   bool operator ==(Object other) => other is Interest && other.id == id;
@@ -58,11 +59,15 @@ class ProfileCard {
     this.countryCode,
     this.isVerified = false,
     this.username,
+    this.zodiac,
   });
 
   final String id;
   final String displayName;
   final String? username;
+
+  /// Null when the person hides their sign.
+  final ZodiacSign? zodiac;
   final int age;
   final Gender gender;
   final String bio;
@@ -80,25 +85,26 @@ class ProfileCard {
   String? get primaryPhoto => photos.isEmpty ? null : photos.first;
 
   factory ProfileCard.fromJson(Map<String, dynamic> json) => ProfileCard(
-        id: json['id'] as String,
-        displayName: json['display_name'] as String,
-        age: (json['age'] as num).toInt(),
-        gender: Gender.fromValue(json['gender'] as String),
-        bio: json['bio'] as String? ?? '',
-        intention: Intention.fromValue(json['intention'] as String? ?? 'figuring_out'),
-        jobTitle: json['job_title'] as String?,
-        city: json['city'] as String?,
-        photos: (json['photos'] as List?)?.cast<String>() ?? const [],
-        interests: (json['interests'] as List?)?.cast<String>() ?? const [],
-        prompts: ((json['prompts'] as List?) ?? const [])
-            .map((p) => ProfilePrompt.fromJson(Map<String, dynamic>.from(p as Map)))
-            .toList(),
-        distanceKm: (json['distance_km'] as num?)?.toInt(),
-        likedAt: json['liked_at'] == null ? null : DateTime.parse(json['liked_at'] as String),
-        countryCode: json['country_code'] as String?,
-        isVerified: json['is_verified'] as bool? ?? false,
-        username: json['username'] as String?,
-      );
+    id: json['id'] as String,
+    displayName: json['display_name'] as String,
+    age: (json['age'] as num).toInt(),
+    gender: Gender.fromValue(json['gender'] as String),
+    bio: json['bio'] as String? ?? '',
+    intention: Intention.fromValue(json['intention'] as String? ?? 'figuring_out'),
+    jobTitle: json['job_title'] as String?,
+    city: json['city'] as String?,
+    photos: (json['photos'] as List?)?.cast<String>() ?? const [],
+    interests: (json['interests'] as List?)?.cast<String>() ?? const [],
+    prompts: ((json['prompts'] as List?) ?? const [])
+        .map((p) => ProfilePrompt.fromJson(Map<String, dynamic>.from(p as Map)))
+        .toList(),
+    distanceKm: (json['distance_km'] as num?)?.toInt(),
+    likedAt: json['liked_at'] == null ? null : DateTime.parse(json['liked_at'] as String),
+    countryCode: json['country_code'] as String?,
+    isVerified: json['is_verified'] as bool? ?? false,
+    username: json['username'] as String?,
+    zodiac: ZodiacSign.fromValue(json['zodiac'] as String?),
+  );
 }
 
 class ProfilePhotoRecord {
@@ -109,10 +115,10 @@ class ProfilePhotoRecord {
   final int position;
 
   factory ProfilePhotoRecord.fromJson(Map<String, dynamic> json) => ProfilePhotoRecord(
-        id: json['id'] as String,
-        storagePath: json['storage_path'] as String,
-        position: (json['position'] as num).toInt(),
-      );
+    id: json['id'] as String,
+    storagePath: json['storage_path'] as String,
+    position: (json['position'] as num).toInt(),
+  );
 }
 
 /// The signed-in user's own, full profile.
@@ -153,6 +159,8 @@ class MyProfile {
 
   String? get primaryPhoto => photos.isEmpty ? null : photos.first.storagePath;
 
+  ZodiacSign get zodiac => ZodiacSign.fromBirthdate(birthdate);
+
   /// 0..1, used to nudge people to complete their profile.
   double get completeness {
     var score = 0.0;
@@ -166,14 +174,16 @@ class MyProfile {
   }
 
   factory MyProfile.fromJson(Map<String, dynamic> json) {
-    final photos = ((json['profile_photos'] as List?) ?? const [])
-        .map((p) => ProfilePhotoRecord.fromJson(Map<String, dynamic>.from(p as Map)))
-        .toList()
-      ..sort((a, b) => a.position.compareTo(b.position));
-    final prompts = ((json['profile_prompts'] as List?) ?? const [])
-        .map((p) => ProfilePrompt.fromJson(Map<String, dynamic>.from(p as Map)))
-        .toList()
-      ..sort((a, b) => a.position.compareTo(b.position));
+    final photos =
+        ((json['profile_photos'] as List?) ?? const [])
+            .map((p) => ProfilePhotoRecord.fromJson(Map<String, dynamic>.from(p as Map)))
+            .toList()
+          ..sort((a, b) => a.position.compareTo(b.position));
+    final prompts =
+        ((json['profile_prompts'] as List?) ?? const [])
+            .map((p) => ProfilePrompt.fromJson(Map<String, dynamic>.from(p as Map)))
+            .toList()
+          ..sort((a, b) => a.position.compareTo(b.position));
     return MyProfile(
       id: json['id'] as String,
       displayName: json['display_name'] as String,
@@ -218,25 +228,24 @@ class DiscoveryPreferences {
   final Set<String> countryCodes;
 
   factory DiscoveryPreferences.fromJson(Map<String, dynamic> json) => DiscoveryPreferences(
-        minAge: (json['min_age'] as num).toInt(),
-        maxAge: (json['max_age'] as num).toInt(),
-        maxDistanceKm: (json['max_distance_km'] as num).toInt(),
-        genders: ((json['genders'] as List?) ?? const []).map((g) => Gender.fromValue(g as String)).toSet(),
-        intentions:
-            ((json['intentions'] as List?) ?? const []).map((i) => Intention.fromValue(i as String)).toSet(),
-        interestIds: ((json['interest_ids'] as List?) ?? const []).map((i) => (i as num).toInt()).toSet(),
-        countryCodes: ((json['country_codes'] as List?) ?? const []).map((c) => c as String).toSet(),
-      );
+    minAge: (json['min_age'] as num).toInt(),
+    maxAge: (json['max_age'] as num).toInt(),
+    maxDistanceKm: (json['max_distance_km'] as num).toInt(),
+    genders: ((json['genders'] as List?) ?? const []).map((g) => Gender.fromValue(g as String)).toSet(),
+    intentions: ((json['intentions'] as List?) ?? const []).map((i) => Intention.fromValue(i as String)).toSet(),
+    interestIds: ((json['interest_ids'] as List?) ?? const []).map((i) => (i as num).toInt()).toSet(),
+    countryCodes: ((json['country_codes'] as List?) ?? const []).map((c) => c as String).toSet(),
+  );
 
   Map<String, dynamic> toJson() => {
-        'min_age': minAge,
-        'max_age': maxAge,
-        'max_distance_km': maxDistanceKm,
-        'genders': genders.map((g) => g.value).toList(),
-        'intentions': intentions.map((i) => i.value).toList(),
-        'interest_ids': interestIds.toList(),
-        'country_codes': countryCodes.toList(),
-      };
+    'min_age': minAge,
+    'max_age': maxAge,
+    'max_distance_km': maxDistanceKm,
+    'genders': genders.map((g) => g.value).toList(),
+    'intentions': intentions.map((i) => i.value).toList(),
+    'interest_ids': interestIds.toList(),
+    'country_codes': countryCodes.toList(),
+  };
 
   DiscoveryPreferences copyWith({
     int? minAge,
@@ -246,16 +255,15 @@ class DiscoveryPreferences {
     Set<Intention>? intentions,
     Set<int>? interestIds,
     Set<String>? countryCodes,
-  }) =>
-      DiscoveryPreferences(
-        minAge: minAge ?? this.minAge,
-        maxAge: maxAge ?? this.maxAge,
-        maxDistanceKm: maxDistanceKm ?? this.maxDistanceKm,
-        genders: genders ?? this.genders,
-        intentions: intentions ?? this.intentions,
-        interestIds: interestIds ?? this.interestIds,
-        countryCodes: countryCodes ?? this.countryCodes,
-      );
+  }) => DiscoveryPreferences(
+    minAge: minAge ?? this.minAge,
+    maxAge: maxAge ?? this.maxAge,
+    maxDistanceKm: maxDistanceKm ?? this.maxDistanceKm,
+    genders: genders ?? this.genders,
+    intentions: intentions ?? this.intentions,
+    interestIds: interestIds ?? this.interestIds,
+    countryCodes: countryCodes ?? this.countryCodes,
+  );
 }
 
 /// Data collected by the onboarding wizard before the profile row exists.
