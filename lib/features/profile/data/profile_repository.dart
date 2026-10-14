@@ -1,0 +1,144 @@
+import 'dart:typed_data';
+
+import 'package:flutter_image_compress/flutter_image_compress.dart';
+import 'package:flutter_riverpod/flutter_riverpod.dart';
+import 'package:intl/intl.dart';
+import 'package:supabase_flutter/supabase_flutter.dart';
+
+import '../../../core/supabase/supabase_providers.dart';
+import '../domain/profile_models.dart';
+
+class ProfileRepository {
+  ProfileRepository(this._client);
+  final SupabaseClient _client;
+
+  static const photoBucket = 'profile-photos';
+
+  String get _uid {
+    final id = _client.auth.currentUser?.id;
+    if (id == null) throw const AuthException('Not signed in');
+    return id;
+  }
+
+  /// The signed-in user's profile, or null if they haven't created one yet.
+  Future<MyProfile?> fetchMyProfile() async {
+    final row = await _client
+        .from('profiles')
+        .select('*, profile_photos(id, storage_path, position), profile_interests(interest_id), '
+            'profile_prompts(id, prompt, answer, position)')
+        .eq('id', _uid)
+        .maybeSingle();
+    return row == null ? null : MyProfile.fromJson(row);
+  }
+
+  Future<void> createProfile(ProfileDraft draft) async {
+    final uid = _uid;
+    // Plain insert (not upsert): birthdate is intentionally not updatable.
+    await _client.from('profiles').insert({
+      'id': uid,
+      'display_name': draft.displayName.trim(),
+      'birthdate': DateFormat('yyyy-MM-dd').format(draft.birthdate),
+      'gender': draft.gender.value,
+      'intention': draft.intention.value,
+    });
+    await _client
+        .from('discovery_preferences')
+        .update({'genders': draft.interestedIn.map((g) => g.value).toList()}).eq('user_id', uid);
+    await setInterests(draft.interestIds);
+  }
+
+  Future<void> updateProfile(Map<String, dynamic> fields) =>
+      _client.from('profiles').update(fields).eq('id', _uid);
+
+  Future<void> setInterests(Set<int> ids) => _client.rpc('set_my_interests', params: {'p_interest_ids': ids.toList()});
+
+  Future<List<Interest>> fetchInterests() async {
+    final rows = await _client.from('interests').select().order('category').order('name');
+    return rows.map(Interest.fromJson).toList();
+  }
+
+  /// Replaces all prompts with [prompts] (max 3).
+  Future<void> savePrompts(List<ProfilePrompt> prompts) async {
+    final uid = _uid;
+    await _client.from('profile_prompts').delete().eq('user_id', uid);
+    if (prompts.isEmpty) return;
+    await _client.from('profile_prompts').insert([
+      for (var i = 0; i < prompts.length && i < 3; i++)
+        {'user_id': uid, 'prompt': prompts[i].prompt, 'answer': prompts[i].answer.trim(), 'position': i},
+    ]);
+  }
+
+  /// Compresses (max 1440px, JPEG ~80%) and uploads a photo, then records it.
+  Future<void> uploadPhoto(XFile file, {required int position}) async {
+    final uid = _uid;
+    final original = await file.readAsBytes();
+    final Uint8List bytes = await _compress(original);
+    final path = '$uid/${DateTime.now().microsecondsSinceEpoch}.jpg';
+
+    await _client.storage.from(photoBucket).uploadBinary(
+          path,
+          bytes,
+          fileOptions: const FileOptions(contentType: 'image/jpeg', upsert: false),
+        );
+    try {
+      await _client.from('profile_photos').insert({'user_id': uid, 'storage_path': path, 'position': position});
+    } catch (_) {
+      // Keep storage and database consistent if the row could not be written.
+      await _client.storage.from(photoBucket).remove([path]);
+      rethrow;
+    }
+  }
+
+  Future<Uint8List> _compress(Uint8List input) async {
+    try {
+      return await FlutterImageCompress.compressWithList(
+        input,
+        minWidth: 1440,
+        minHeight: 1440,
+        quality: 80,
+        format: CompressFormat.jpeg,
+      );
+    } catch (_) {
+      return input; // Unsupported platform/format: upload as-is (bucket limit is 5 MB).
+    }
+  }
+
+  Future<void> deletePhoto(ProfilePhotoRecord photo) async {
+    await _client.from('profile_photos').delete().eq('id', photo.id);
+    await _client.storage.from(photoBucket).remove([photo.storagePath]);
+  }
+
+  /// Persists photo order; index in [ordered] becomes the position.
+  Future<void> reorderPhotos(List<ProfilePhotoRecord> ordered) async {
+    for (var i = 0; i < ordered.length; i++) {
+      if (ordered[i].position != i) {
+        await _client.from('profile_photos').update({'position': i}).eq('id', ordered[i].id);
+      }
+    }
+  }
+
+  Future<void> setLocation({required double lat, required double lng}) =>
+      _client.rpc('set_my_location', params: {'p_lat': lat, 'p_lng': lng});
+
+  Future<void> completeOnboarding() => _client.rpc('complete_onboarding');
+
+  Future<void> touchLastActive() => _client.rpc('touch_last_active');
+
+  /// Someone else's profile (only works for matches and people who liked you).
+  Future<ProfileCard?> fetchPublicProfile(String userId) async {
+    final row = await _client.from('public_profiles').select().eq('id', userId).maybeSingle();
+    return row == null ? null : ProfileCard.fromJson(row);
+  }
+
+  Future<DiscoveryPreferences> fetchPreferences() async {
+    final row = await _client.from('discovery_preferences').select().eq('user_id', _uid).single();
+    return DiscoveryPreferences.fromJson(row);
+  }
+
+  Future<void> savePreferences(DiscoveryPreferences prefs) =>
+      _client.from('discovery_preferences').update(prefs.toJson()).eq('user_id', _uid);
+}
+
+final profileRepositoryProvider = Provider<ProfileRepository>(
+  (ref) => ProfileRepository(ref.watch(supabaseClientProvider)),
+);
