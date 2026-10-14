@@ -1,5 +1,5 @@
 -- =============================================================================
--- Amora backend functions
+-- Woops backend functions
 --
 -- Everything sensitive (likes, matching, messaging, blocking, reporting) goes
 -- through these SECURITY DEFINER functions. Clients have no direct write access

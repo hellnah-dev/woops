@@ -1,7 +1,7 @@
-import 'package:amora/core/utils/app_exception.dart';
-import 'package:amora/core/utils/time_format.dart';
-import 'package:amora/core/utils/uuid.dart';
-import 'package:amora/core/utils/validators.dart';
+import 'package:woops/core/utils/app_exception.dart';
+import 'package:woops/core/utils/time_format.dart';
+import 'package:woops/core/utils/uuid.dart';
+import 'package:woops/core/utils/validators.dart';
 import 'package:flutter_test/flutter_test.dart';
 import 'package:supabase_flutter/supabase_flutter.dart';
 

@@ -1,9 +1,11 @@
 import 'package:flutter/material.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
 
+import '../../../core/i18n/countries.dart';
 import '../../../core/theme/app_colors.dart';
 import '../../../core/utils/validators.dart';
 import '../../../core/widgets/choice_chips.dart';
+import '../../../core/widgets/country_picker.dart';
 import '../../../core/widgets/state_views.dart';
 import '../application/profile_providers.dart';
 import '../data/profile_repository.dart';
@@ -11,6 +13,7 @@ import '../domain/profile_enums.dart';
 import '../domain/profile_models.dart';
 import 'photo_grid_editor.dart';
 import 'profile_field_widgets.dart';
+import 'username_field.dart';
 
 class EditProfileScreen extends ConsumerStatefulWidget {
   const EditProfileScreen({super.key});
@@ -28,6 +31,9 @@ class _EditProfileScreenState extends ConsumerState<EditProfileScreen> {
   late Gender _gender;
   late Intention _intention;
   late Set<int> _interests;
+  String? _country;
+  late String _username;
+  bool _usernameOk = true;
   late List<ProfilePrompt> _prompts;
   bool _saving = false;
 
@@ -42,6 +48,9 @@ class _EditProfileScreenState extends ConsumerState<EditProfileScreen> {
     _gender = p.gender;
     _intention = p.intention;
     _interests = {...p.interestIds};
+    _country = p.countryCode;
+    _username = p.username ?? '';
+    _usernameOk = p.username != null;
     _prompts = [...p.prompts];
   }
 
@@ -56,6 +65,10 @@ class _EditProfileScreenState extends ConsumerState<EditProfileScreen> {
 
   Future<void> _save() async {
     if (!_form.currentState!.validate()) return;
+    if (!_usernameOk) {
+      showSnack(context, 'Choose an available username', isError: true);
+      return;
+    }
     if (_interests.isEmpty) {
       showSnack(context, 'Pick at least one interest', isError: true);
       return;
@@ -71,6 +84,8 @@ class _EditProfileScreenState extends ConsumerState<EditProfileScreen> {
         'city': nullIfEmpty(_city.text),
         'gender': _gender.value,
         'intention': _intention.value,
+        'country_code': _country,
+        'username': _username.trim().toLowerCase(),
       });
       await repo.setInterests(_interests);
       await repo.savePrompts(_prompts);
@@ -115,6 +130,15 @@ class _EditProfileScreenState extends ConsumerState<EditProfileScreen> {
                 textCapitalization: TextCapitalization.words,
                 validator: Validators.displayName,
               ),
+              const SectionLabel('Username'),
+              UsernameField(
+                initial: _username,
+                current: ref.read(myProfileProvider).valueOrNull?.username,
+                onChanged: (v, ok) => setState(() {
+                  _username = v;
+                  _usernameOk = ok;
+                }),
+              ),
               const SectionLabel('About me'),
               TextFormField(
                 controller: _bio,
@@ -132,6 +156,15 @@ class _EditProfileScreenState extends ConsumerState<EditProfileScreen> {
                 maxLength: 60,
                 textCapitalization: TextCapitalization.words,
                 decoration: const InputDecoration(hintText: 'Job title'),
+              ),
+              const SectionLabel('Country'),
+              OutlinedButton.icon(
+                onPressed: () async {
+                  final c = await showCountryPicker(context, selected: _country);
+                  if (c != null) setState(() => _country = c.code);
+                },
+                icon: Text(countryByCode(_country)?.flag ?? '🌍', style: const TextStyle(fontSize: 20)),
+                label: Text(countryByCode(_country)?.name ?? 'Choose your country'),
               ),
               const SectionLabel('City'),
               TextFormField(

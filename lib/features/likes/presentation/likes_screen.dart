@@ -101,7 +101,7 @@ class _LikeTile extends StatelessWidget {
           child: Stack(
             fit: StackFit.expand,
             children: [
-              ProfilePhoto(storagePath: card.primaryPhoto, memCacheWidth: 500),
+              ProfilePhoto(storagePath: card.primaryPhoto, thumbnail: true, memCacheWidth: 500),
               const DecoratedBox(decoration: BoxDecoration(gradient: AppColors.photoScrim)),
               Positioned(
                 left: 12,

@@ -1,16 +1,16 @@
-import 'dart:typed_data';
-
-import 'package:flutter_image_compress/flutter_image_compress.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
+import 'package:image_picker/image_picker.dart';
 import 'package:intl/intl.dart';
 import 'package:supabase_flutter/supabase_flutter.dart';
 
 import '../../../core/supabase/supabase_providers.dart';
+import '../../../core/utils/image_processing.dart';
 import '../domain/profile_models.dart';
 
 class ProfileRepository {
-  ProfileRepository(this._client);
+  ProfileRepository(this._client, {ImageProcessor? images}) : _images = images ?? ImageProcessor();
   final SupabaseClient _client;
+  final ImageProcessor _images;
 
   static const photoBucket = 'profile-photos';
 
@@ -40,6 +40,9 @@ class ProfileRepository {
       'birthdate': DateFormat('yyyy-MM-dd').format(draft.birthdate),
       'gender': draft.gender.value,
       'intention': draft.intention.value,
+      'country_code': draft.countryCode,
+      'username': draft.username.trim().toLowerCase(),
+      if ((draft.city ?? '').trim().isNotEmpty) 'city': draft.city!.trim(),
     });
     await _client
         .from('discovery_preferences')
@@ -68,44 +71,60 @@ class ProfileRepository {
     ]);
   }
 
-  /// Compresses (max 1440px, JPEG ~80%) and uploads a photo, then records it.
+  /// Compresses (WebP, ≤1280 px, ≤350 KB, metadata stripped), uploads the
+  /// photo and a 400 px thumbnail, then records it.
   Future<void> uploadPhoto(XFile file, {required int position}) async {
     final uid = _uid;
-    final original = await file.readAsBytes();
-    final Uint8List bytes = await _compress(original);
-    final path = '$uid/${DateTime.now().microsecondsSinceEpoch}.jpg';
+    final processed = await _images.processProfilePhoto(await file.readAsBytes());
+    final path = '$uid/${DateTime.now().microsecondsSinceEpoch}.${processed.format.extension}';
+    final bucket = _client.storage.from(photoBucket);
+    final options = FileOptions(contentType: processed.format.contentType, upsert: false);
 
-    await _client.storage.from(photoBucket).uploadBinary(
-          path,
-          bytes,
-          fileOptions: const FileOptions(contentType: 'image/jpeg', upsert: false),
-        );
+    await bucket.uploadBinary(path, processed.full, fileOptions: options);
+    if (processed.thumbnail != null) {
+      try {
+        await bucket.uploadBinary(thumbnailPathFor(path), processed.thumbnail!, fileOptions: options);
+      } catch (_) {
+        // Not fatal: the app falls back to the full image when a thumbnail is missing.
+      }
+    }
     try {
       await _client.from('profile_photos').insert({'user_id': uid, 'storage_path': path, 'position': position});
     } catch (_) {
       // Keep storage and database consistent if the row could not be written.
-      await _client.storage.from(photoBucket).remove([path]);
+      await bucket.remove([path, thumbnailPathFor(path)]);
       rethrow;
     }
   }
 
-  Future<Uint8List> _compress(Uint8List input) async {
-    try {
-      return await FlutterImageCompress.compressWithList(
-        input,
-        minWidth: 1440,
-        minHeight: 1440,
-        quality: 80,
-        format: CompressFormat.jpeg,
-      );
-    } catch (_) {
-      return input; // Unsupported platform/format: upload as-is (bucket limit is 5 MB).
-    }
+  /// Uploads a verification selfie (only admins can view it) and opens a request.
+  Future<void> requestVerification(XFile selfie) async {
+    final uid = _uid;
+    final bytes = await _images.processSelfie(await selfie.readAsBytes());
+    final path = '$uid/${DateTime.now().microsecondsSinceEpoch}.jpg';
+    await _client.storage.from('verification-selfies').uploadBinary(
+          path,
+          bytes,
+          fileOptions: const FileOptions(contentType: 'image/jpeg', upsert: false),
+        );
+    await _client.rpc('request_verification', params: {'p_selfie_path': path});
+  }
+
+  /// Latest verification request status: null, 'pending', 'approved' or 'rejected'.
+  Future<({String status, String? reason})?> latestVerification() async {
+    final row = await _client
+        .from('verification_requests')
+        .select('status, reject_reason')
+        .eq('user_id', _uid)
+        .order('created_at', ascending: false)
+        .limit(1)
+        .maybeSingle();
+    return row == null ? null : (status: row['status'] as String, reason: row['reject_reason'] as String?);
   }
 
   Future<void> deletePhoto(ProfilePhotoRecord photo) async {
     await _client.from('profile_photos').delete().eq('id', photo.id);
-    await _client.storage.from(photoBucket).remove([photo.storagePath]);
+    await _client.storage.from(photoBucket).remove([photo.storagePath, thumbnailPathFor(photo.storagePath)]);
   }
 
   /// Persists photo order; index in [ordered] becomes the position.
@@ -116,6 +135,9 @@ class ProfileRepository {
       }
     }
   }
+
+  Future<bool> isUsernameAvailable(String username) async =>
+      await _client.rpc('is_username_available', params: {'p_username': username.trim()}) as bool;
 
   Future<void> setLocation({required double lat, required double lng}) =>
       _client.rpc('set_my_location', params: {'p_lat': lat, 'p_lng': lng});

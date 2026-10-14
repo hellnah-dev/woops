@@ -116,7 +116,7 @@ async function buildPushes(db: SupabaseClient, payload: WebhookPayload): Promise
       userId: r.swipee_id as string,
       pref: "new_likes",
       title: "Someone likes you 💘",
-      body: "Open Amora to see who.",
+      body: "Open Woops to see who.",
       data: { type: "like" },
     }];
   }

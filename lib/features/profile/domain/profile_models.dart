@@ -55,10 +55,14 @@ class ProfileCard {
     this.city,
     this.distanceKm,
     this.likedAt,
+    this.countryCode,
+    this.isVerified = false,
+    this.username,
   });
 
   final String id;
   final String displayName;
+  final String? username;
   final int age;
   final Gender gender;
   final String bio;
@@ -70,6 +74,8 @@ class ProfileCard {
   final List<ProfilePrompt> prompts;
   final int? distanceKm;
   final DateTime? likedAt;
+  final String? countryCode;
+  final bool isVerified;
 
   String? get primaryPhoto => photos.isEmpty ? null : photos.first;
 
@@ -89,6 +95,9 @@ class ProfileCard {
             .toList(),
         distanceKm: (json['distance_km'] as num?)?.toInt(),
         likedAt: json['liked_at'] == null ? null : DateTime.parse(json['liked_at'] as String),
+        countryCode: json['country_code'] as String?,
+        isVerified: json['is_verified'] as bool? ?? false,
+        username: json['username'] as String?,
       );
 }
 
@@ -121,16 +130,22 @@ class MyProfile {
     required this.prompts,
     this.jobTitle,
     this.city,
+    this.countryCode,
+    this.isVerified = false,
+    this.username,
   });
 
   final String id;
   final String displayName;
+  final String? username;
   final DateTime birthdate;
   final Gender gender;
   final String bio;
   final Intention intention;
   final String? jobTitle;
   final String? city;
+  final String? countryCode;
+  final bool isVerified;
   final bool onboardingCompleted;
   final List<ProfilePhotoRecord> photos;
   final Set<int> interestIds;
@@ -168,6 +183,9 @@ class MyProfile {
       intention: Intention.fromValue(json['intention'] as String),
       jobTitle: json['job_title'] as String?,
       city: json['city'] as String?,
+      countryCode: json['country_code'] as String?,
+      isVerified: json['is_verified'] as bool? ?? false,
+      username: json['username'] as String?,
       onboardingCompleted: json['onboarding_completed'] as bool? ?? false,
       photos: photos,
       interestIds: ((json['profile_interests'] as List?) ?? const [])
@@ -186,6 +204,7 @@ class DiscoveryPreferences {
     this.genders = const {Gender.woman, Gender.man, Gender.nonbinary},
     this.intentions = const {},
     this.interestIds = const {},
+    this.countryCodes = const {},
   });
 
   final int minAge;
@@ -195,6 +214,9 @@ class DiscoveryPreferences {
   final Set<Intention> intentions;
   final Set<int> interestIds;
 
+  /// Empty = any country.
+  final Set<String> countryCodes;
+
   factory DiscoveryPreferences.fromJson(Map<String, dynamic> json) => DiscoveryPreferences(
         minAge: (json['min_age'] as num).toInt(),
         maxAge: (json['max_age'] as num).toInt(),
@@ -203,6 +225,7 @@ class DiscoveryPreferences {
         intentions:
             ((json['intentions'] as List?) ?? const []).map((i) => Intention.fromValue(i as String)).toSet(),
         interestIds: ((json['interest_ids'] as List?) ?? const []).map((i) => (i as num).toInt()).toSet(),
+        countryCodes: ((json['country_codes'] as List?) ?? const []).map((c) => c as String).toSet(),
       );
 
   Map<String, dynamic> toJson() => {
@@ -212,6 +235,7 @@ class DiscoveryPreferences {
         'genders': genders.map((g) => g.value).toList(),
         'intentions': intentions.map((i) => i.value).toList(),
         'interest_ids': interestIds.toList(),
+        'country_codes': countryCodes.toList(),
       };
 
   DiscoveryPreferences copyWith({
@@ -221,6 +245,7 @@ class DiscoveryPreferences {
     Set<Gender>? genders,
     Set<Intention>? intentions,
     Set<int>? interestIds,
+    Set<String>? countryCodes,
   }) =>
       DiscoveryPreferences(
         minAge: minAge ?? this.minAge,
@@ -229,6 +254,7 @@ class DiscoveryPreferences {
         genders: genders ?? this.genders,
         intentions: intentions ?? this.intentions,
         interestIds: interestIds ?? this.interestIds,
+        countryCodes: countryCodes ?? this.countryCodes,
       );
 }
 
@@ -241,6 +267,9 @@ class ProfileDraft {
     required this.interestedIn,
     required this.intention,
     required this.interestIds,
+    required this.countryCode,
+    required this.username,
+    this.city,
   });
 
   final String displayName;
@@ -249,4 +278,7 @@ class ProfileDraft {
   final Set<Gender> interestedIn;
   final Intention intention;
   final Set<int> interestIds;
+  final String countryCode;
+  final String username;
+  final String? city;
 }

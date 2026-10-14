@@ -1,7 +1,7 @@
-import 'package:amora/core/supabase/supabase_providers.dart';
-import 'package:amora/features/chat/application/chat_controllers.dart';
-import 'package:amora/features/chat/data/chat_repository.dart';
-import 'package:amora/features/chat/domain/chat_models.dart';
+import 'package:woops/core/supabase/supabase_providers.dart';
+import 'package:woops/features/chat/application/chat_controllers.dart';
+import 'package:woops/features/chat/data/chat_repository.dart';
+import 'package:woops/features/chat/domain/chat_models.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
 import 'package:flutter_test/flutter_test.dart';
 

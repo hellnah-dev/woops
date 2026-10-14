@@ -1,10 +1,10 @@
-import 'package:amora/core/supabase/supabase_providers.dart';
-import 'package:amora/core/theme/app_theme.dart';
-import 'package:amora/core/widgets/app_logo.dart';
-import 'package:amora/features/auth/presentation/auth_screens.dart';
-import 'package:amora/features/discovery/data/discovery_repository.dart';
-import 'package:amora/features/discovery/presentation/discover_screen.dart';
-import 'package:amora/features/discovery/presentation/swipeable_card.dart';
+import 'package:woops/core/supabase/supabase_providers.dart';
+import 'package:woops/core/theme/app_theme.dart';
+import 'package:woops/core/widgets/app_logo.dart';
+import 'package:woops/features/auth/presentation/auth_screens.dart';
+import 'package:woops/features/discovery/data/discovery_repository.dart';
+import 'package:woops/features/discovery/presentation/discover_screen.dart';
+import 'package:woops/features/discovery/presentation/swipeable_card.dart';
 import 'package:flutter/material.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
 import 'package:flutter_test/flutter_test.dart';
@@ -24,14 +24,16 @@ void main() {
     expect(tester.getSize(find.byType(AppLogo)), const Size(100, 100));
   });
 
-  testWidgets('Sign-up validates email, password, match and 18+ confirmation', (tester) async {
+  testWidgets('Sign-up age gate requires date of birth, consent and valid credentials', (tester) async {
     await tester.pumpWidget(_app(const SignUpScreen()));
+    await tester.ensureVisible(find.text('Create account'));
     await tester.tap(find.text('Create account'));
     await tester.pump();
 
     expect(find.text('Enter your email'), findsOneWidget);
     expect(find.text('Enter a password'), findsOneWidget);
-    expect(find.text('You must be 18+ to use Amora'), findsOneWidget);
+    expect(find.text('Enter your date of birth'), findsOneWidget);
+    expect(find.text('Please accept to continue'), findsNWidgets(2));
 
     await tester.enterText(find.byKey(const Key('signup-email')), 'asha@example.com');
     await tester.enterText(find.descendant(of: find.byKey(const Key('signup-password')), matching: find.byType(TextFormField)), 'goodpass1');

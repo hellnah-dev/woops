@@ -1,5 +1,5 @@
 -- =============================================================================
--- Amora security: privileges + Row Level Security
+-- Woops security: privileges + Row Level Security
 --
 -- Principle: deny by default. We revoke everything Supabase grants to the
 -- `anon` / `authenticated` roles by default, then grant back only what the app

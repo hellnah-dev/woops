@@ -1,8 +1,11 @@
 import 'package:flutter/material.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
 
+import '../../../core/i18n/countries.dart';
+import '../../../core/i18n/units.dart';
 import '../../../core/theme/app_colors.dart';
 import '../../../core/widgets/choice_chips.dart';
+import '../../../core/widgets/country_picker.dart';
 import '../../../core/widgets/state_views.dart';
 import '../../profile/application/profile_providers.dart';
 import '../../profile/data/profile_repository.dart';
@@ -25,6 +28,16 @@ class FiltersSheet extends ConsumerStatefulWidget {
 
   @override
   ConsumerState<FiltersSheet> createState() => _FiltersSheetState();
+}
+
+/// Slider stops in km; the last one means "Anywhere".
+const _distanceStops = [1, 2, 5, 10, 15, 25, 40, 50, 75, 100, 150, 200, 300, 500, 1000, 2000, DistanceUnits.anywhereKm];
+
+int _stopIndex(int km) {
+  for (var i = 0; i < _distanceStops.length; i++) {
+    if (_distanceStops[i] >= km) return i;
+  }
+  return _distanceStops.length - 1;
 }
 
 class _FiltersSheetState extends ConsumerState<FiltersSheet> {
@@ -77,14 +90,35 @@ class _FiltersSheetState extends ConsumerState<FiltersSheet> {
                       labels: RangeLabels('${p.minAge}', '${p.maxAge}'),
                       onChanged: (v) => setState(() => _prefs = p.copyWith(minAge: v.start.round(), maxAge: v.end.round())),
                     ),
-                    SectionLabel('Maximum distance', trailing: '${p.maxDistanceKm} km'),
+                    SectionLabel('Maximum distance', trailing: DistanceUnits.limit(p.maxDistanceKm)),
                     Slider(
-                      min: 1,
-                      max: 300,
-                      divisions: 299,
-                      value: p.maxDistanceKm.clamp(1, 300).toDouble(),
-                      label: '${p.maxDistanceKm} km',
-                      onChanged: (v) => setState(() => _prefs = p.copyWith(maxDistanceKm: v.round())),
+                      min: 0,
+                      max: _distanceStops.length - 1,
+                      divisions: _distanceStops.length - 1,
+                      value: _stopIndex(p.maxDistanceKm).toDouble(),
+                      label: DistanceUnits.limit(p.maxDistanceKm),
+                      onChanged: (v) => setState(() => _prefs = p.copyWith(maxDistanceKm: _distanceStops[v.round()])),
+                    ),
+                    const SectionLabel('Countries', trailing: 'Any if none selected'),
+                    Wrap(
+                      spacing: 8,
+                      runSpacing: 8,
+                      children: [
+                        for (final code in p.countryCodes)
+                          if (countryByCode(code) case final c?)
+                            InputChip(
+                              label: Text('${c.flag} ${c.name}'),
+                              onDeleted: () => setState(() => _prefs = p.copyWith(countryCodes: {...p.countryCodes}..remove(code))),
+                            ),
+                        ActionChip(
+                          avatar: const Icon(Icons.add_rounded, size: 18),
+                          label: Text(p.countryCodes.isEmpty ? 'Choose countries' : 'Edit'),
+                          onPressed: () async {
+                            final chosen = await showCountryMultiPicker(context, selected: p.countryCodes);
+                            if (chosen != null) setState(() => _prefs = p.copyWith(countryCodes: chosen));
+                          },
+                        ),
+                      ],
                     ),
                     const SectionLabel('Show me'),
                     ChoiceChipGroup<Gender>(

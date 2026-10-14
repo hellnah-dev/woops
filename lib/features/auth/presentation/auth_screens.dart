@@ -2,14 +2,18 @@ import 'package:flutter/material.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
 import 'package:go_router/go_router.dart';
 
+import 'package:intl/intl.dart';
+
+import '../../../core/i18n/countries.dart';
 import '../../../core/router/app_router.dart';
 import '../../../core/theme/app_colors.dart';
 import '../../../core/utils/validators.dart';
 import '../../../core/widgets/app_logo.dart';
 import '../../../core/widgets/buttons.dart';
+import '../../../core/widgets/country_picker.dart';
 import '../../../core/widgets/state_views.dart';
+import '../../legal/legal_screen.dart';
 import '../data/auth_repository.dart';
-import 'welcome_screen.dart';
 
 /// Shared scaffold for the auth forms.
 class _AuthScaffold extends StatelessWidget {
@@ -171,14 +175,21 @@ class SignUpScreen extends ConsumerStatefulWidget {
   ConsumerState<SignUpScreen> createState() => _SignUpScreenState();
 }
 
+/// Sign-up with a neutral age gate: people enter their date of birth (we
+/// never hint at the required age) and country, which decides the minimum age
+/// (18, or higher where local law requires). The server re-checks both.
 class _SignUpScreenState extends ConsumerState<SignUpScreen> {
   final _form = GlobalKey<FormState>();
   final _email = TextEditingController();
   final _password = TextEditingController();
   final _confirm = TextEditingController();
-  bool _adult = false;
+  DateTime? _birthdate;
+  String? _country = deviceCountryCode();
+  bool _acceptTerms = false;
+  bool _acceptGuidelines = false;
+  bool _showErrors = false;
   bool _loading = false;
-  bool _showAgeError = false;
+  int? _blockedMinAge;
 
   @override
   void dispose() {
@@ -188,14 +199,48 @@ class _SignUpScreenState extends ConsumerState<SignUpScreen> {
     super.dispose();
   }
 
+  Future<void> _pickBirthdate() async {
+    final now = DateTime.now();
+    final picked = await showDatePicker(
+      context: context,
+      initialDate: _birthdate ?? DateTime(now.year - 25, now.month, now.day),
+      firstDate: DateTime(now.year - 100),
+      lastDate: now,
+      helpText: 'Your date of birth',
+      initialEntryMode: DatePickerEntryMode.input,
+    );
+    if (picked != null) setState(() => _birthdate = picked);
+  }
+
+  Future<void> _pickCountry() async {
+    final c = await showCountryPicker(context, selected: _country);
+    if (c != null) setState(() => _country = c.code);
+  }
+
+  bool get _gateComplete => _birthdate != null && _country != null && _acceptTerms && _acceptGuidelines;
+
   Future<void> _submit() async {
     final valid = _form.currentState!.validate();
-    setState(() => _showAgeError = !_adult);
-    if (!valid || !_adult) return;
+    setState(() => _showErrors = true);
+    if (!valid || !_gateComplete) return;
 
     setState(() => _loading = true);
+    final auth = ref.read(authRepositoryProvider);
     try {
-      final signedIn = await ref.read(authRepositoryProvider).signUp(email: _email.text, password: _password.text);
+      final minAge = await auth.minAgeFor(_country!);
+      if (ageFromBirthdate(_birthdate!) < minAge) {
+        setState(() => _blockedMinAge = minAge);
+        return;
+      }
+      final signedIn = await auth.signUp(
+        email: _email.text,
+        password: _password.text,
+        birthdate: _birthdate!,
+        countryCode: _country!,
+      );
+      if (signedIn) {
+        await auth.acceptLegal(LegalDoc.version).catchError((_) {});
+      }
       if (!mounted) return;
       if (!signedIn) {
         await showDialog<void>(
@@ -220,9 +265,25 @@ class _SignUpScreenState extends ConsumerState<SignUpScreen> {
   @override
   Widget build(BuildContext context) {
     final theme = Theme.of(context);
+    final error = theme.colorScheme.error;
+
+    if (_blockedMinAge != null) {
+      return Scaffold(
+        appBar: AppBar(),
+        body: EmptyState(
+          icon: Icons.no_accounts_outlined,
+          title: 'Sorry, you can’t join Woops',
+          message: 'Woops is only for adults aged $_blockedMinAge or older in your country.',
+          actionLabel: 'Back',
+          onAction: () => context.go(Routes.welcome),
+        ),
+      );
+    }
+
+    final country = countryByCode(_country);
     return _AuthScaffold(
       title: 'Create your account',
-      subtitle: 'It takes about two minutes. Let’s go.',
+      subtitle: 'Woops is for adults only. It takes about two minutes.',
       child: Form(
         key: _form,
         child: AutofillGroup(
@@ -248,30 +309,111 @@ class _SignUpScreenState extends ConsumerState<SignUpScreen> {
                 validator: (v) => v != _password.text ? 'Passwords don’t match' : null,
               ),
               const SizedBox(height: AppSpacing.md),
+              _GateTile(
+                key: const Key('signup-country'),
+                icon: Icons.public_rounded,
+                label: 'Country',
+                value: country == null ? null : '${country.flag}  ${country.name}',
+                error: _showErrors && country == null ? 'Choose your country' : null,
+                onTap: _pickCountry,
+              ),
+              const SizedBox(height: AppSpacing.sm),
+              _GateTile(
+                key: const Key('signup-birthdate'),
+                icon: Icons.cake_outlined,
+                label: 'Date of birth',
+                value: _birthdate == null ? null : DateFormat.yMMMMd().format(_birthdate!),
+                error: _showErrors && _birthdate == null ? 'Enter your date of birth' : null,
+                onTap: _pickBirthdate,
+              ),
+              const SizedBox(height: AppSpacing.sm),
               CheckboxListTile(
-                key: const Key('signup-adult'),
-                value: _adult,
+                key: const Key('signup-terms'),
+                value: _acceptTerms,
                 contentPadding: EdgeInsets.zero,
                 controlAffinity: ListTileControlAffinity.leading,
-                onChanged: (v) => setState(() {
-                  _adult = v ?? false;
-                  if (_adult) _showAgeError = false;
-                }),
-                title: const Text('I confirm I am 18 or older'),
-                subtitle: _showAgeError
-                    ? Text('You must be 18+ to use Amora', style: TextStyle(color: theme.colorScheme.error))
+                onChanged: (v) => setState(() => _acceptTerms = v ?? false),
+                title: Wrap(
+                  crossAxisAlignment: WrapCrossAlignment.center,
+                  children: [
+                    const Text('I agree to the '),
+                    _InlineLink('Terms', () => openLegal(context, LegalDoc.terms)),
+                    const Text(' and '),
+                    _InlineLink('Privacy Policy', () => openLegal(context, LegalDoc.privacy)),
+                  ],
+                ),
+                subtitle: _showErrors && !_acceptTerms
+                    ? Text('Please accept to continue', style: TextStyle(color: error))
+                    : null,
+              ),
+              CheckboxListTile(
+                key: const Key('signup-guidelines'),
+                value: _acceptGuidelines,
+                contentPadding: EdgeInsets.zero,
+                controlAffinity: ListTileControlAffinity.leading,
+                onChanged: (v) => setState(() => _acceptGuidelines = v ?? false),
+                title: Wrap(
+                  crossAxisAlignment: WrapCrossAlignment.center,
+                  children: [
+                    const Text('I will follow the '),
+                    _InlineLink('Community Guidelines', () => openLegal(context, LegalDoc.guidelines)),
+                  ],
+                ),
+                subtitle: _showErrors && !_acceptGuidelines
+                    ? Text('Please accept to continue', style: TextStyle(color: error))
                     : null,
               ),
               const SizedBox(height: AppSpacing.md),
               PrimaryButton(label: 'Create account', loading: _loading, onPressed: _submit),
-              const SizedBox(height: AppSpacing.lg),
-              const LegalText(),
             ],
           ),
         ),
       ),
     );
   }
+}
+
+class _GateTile extends StatelessWidget {
+  const _GateTile({super.key, required this.icon, required this.label, required this.value, required this.onTap, this.error});
+
+  final IconData icon;
+  final String label;
+  final String? value;
+  final String? error;
+  final VoidCallback onTap;
+
+  @override
+  Widget build(BuildContext context) {
+    final theme = Theme.of(context);
+    return InkWell(
+      borderRadius: BorderRadius.circular(AppRadius.md),
+      onTap: onTap,
+      child: InputDecorator(
+        decoration: InputDecoration(labelText: label, prefixIcon: Icon(icon), errorText: error),
+        isEmpty: value == null,
+        child: value == null ? null : Text(value!, style: theme.textTheme.bodyLarge),
+      ),
+    );
+  }
+}
+
+class _InlineLink extends StatelessWidget {
+  const _InlineLink(this.text, this.onTap);
+  final String text;
+  final VoidCallback onTap;
+
+  @override
+  Widget build(BuildContext context) => InkWell(
+        onTap: onTap,
+        child: Text(
+          text,
+          style: TextStyle(
+            color: Theme.of(context).colorScheme.primary,
+            fontWeight: FontWeight.w600,
+            decoration: TextDecoration.underline,
+          ),
+        ),
+      );
 }
 
 // -----------------------------------------------------------------------------

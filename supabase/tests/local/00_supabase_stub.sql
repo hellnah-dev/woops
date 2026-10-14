@@ -11,7 +11,7 @@ begin
 end $$;
 
 create schema auth;
-create table auth.users (id uuid primary key, email text);
+create table auth.users (id uuid primary key, email text, raw_user_meta_data jsonb not null default '{}', last_sign_in_at timestamptz);
 
 create function auth.uid() returns uuid language sql stable as $$
   select coalesce(

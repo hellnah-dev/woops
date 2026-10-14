@@ -2,7 +2,6 @@ import 'package:flutter/material.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
 import 'package:go_router/go_router.dart';
 import 'package:supabase_flutter/supabase_flutter.dart';
-import 'package:url_launcher/url_launcher.dart';
 
 import '../../../core/config/env.dart';
 import '../../../core/router/app_router.dart';
@@ -10,6 +9,7 @@ import '../../../core/theme/app_colors.dart';
 import '../../../core/widgets/app_logo.dart';
 import '../../../core/widgets/buttons.dart';
 import '../../../core/widgets/state_views.dart';
+import '../../legal/legal_screen.dart';
 import '../data/auth_repository.dart';
 
 class WelcomeScreen extends ConsumerStatefulWidget {
@@ -106,6 +106,22 @@ class _WelcomeScreenState extends ConsumerState<WelcomeScreen> {
                           ),
                         ],
                         const SizedBox(height: AppSpacing.lg),
+                        Row(
+                          mainAxisAlignment: MainAxisAlignment.center,
+                          children: [
+                            Container(
+                              padding: const EdgeInsets.symmetric(horizontal: 8, vertical: 2),
+                              decoration: BoxDecoration(
+                                border: Border.all(color: theme.colorScheme.outline),
+                                borderRadius: BorderRadius.circular(6),
+                              ),
+                              child: Text('18+', style: theme.textTheme.labelMedium),
+                            ),
+                            const SizedBox(width: 8),
+                            Text('Adults only', style: theme.textTheme.bodySmall),
+                          ],
+                        ),
+                        const SizedBox(height: AppSpacing.sm),
                         const LegalText(),
                         const SizedBox(height: AppSpacing.md),
                       ],
@@ -129,8 +145,8 @@ class LegalText extends StatelessWidget {
     final theme = Theme.of(context);
     final style = theme.textTheme.bodySmall?.copyWith(color: theme.colorScheme.onSurfaceVariant);
     final link = style?.copyWith(decoration: TextDecoration.underline, fontWeight: FontWeight.w600);
-    Widget linkButton(String label, String url) => InkWell(
-          onTap: () => launchUrl(Uri.parse(url), mode: LaunchMode.externalApplication),
+    Widget linkButton(String label, LegalDoc doc) => InkWell(
+          onTap: () => openLegal(context, doc),
           child: Padding(padding: const EdgeInsets.symmetric(vertical: 4), child: Text(label, style: link)),
         );
     return Column(
@@ -141,11 +157,11 @@ class LegalText extends StatelessWidget {
           crossAxisAlignment: WrapCrossAlignment.center,
           spacing: 6,
           children: [
-            linkButton('Terms', Env.termsUrl),
+            linkButton('Terms', LegalDoc.terms),
             Text('·', style: style),
-            linkButton('Privacy Policy', Env.privacyUrl),
+            linkButton('Privacy Policy', LegalDoc.privacy),
             Text('·', style: style),
-            linkButton('Community Guidelines', Env.guidelinesUrl),
+            linkButton('Community Guidelines', LegalDoc.guidelines),
           ],
         ),
       ],

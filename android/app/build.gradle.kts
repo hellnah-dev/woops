@@ -14,7 +14,7 @@ val keystoreProperties = Properties().apply {
 }
 
 android {
-    namespace = "com.amora.amora"
+    namespace = "com.woops.app"
     compileSdk = flutter.compileSdkVersion
     ndkVersion = flutter.ndkVersion
 
@@ -29,7 +29,7 @@ android {
 
     defaultConfig {
         // Change this to your own unique id before publishing.
-        applicationId = "com.amora.amora"
+        applicationId = "com.woops.app"
         minSdk = maxOf(flutter.minSdkVersion, 23)
         targetSdk = flutter.targetSdkVersion
         versionCode = flutter.versionCode

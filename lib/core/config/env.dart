@@ -18,7 +18,7 @@ class Env {
   /// Must also be added to Supabase → Authentication → URL Configuration.
   static const authRedirectUrl = String.fromEnvironment(
     'AUTH_REDIRECT_URL',
-    defaultValue: 'com.amora.amora://login-callback',
+    defaultValue: 'com.woops.app://login-callback',
   );
 
   static const enableGoogleSignIn = bool.fromEnvironment('ENABLE_GOOGLE_SIGN_IN');
@@ -31,7 +31,7 @@ class Env {
   static const firebaseAndroidAppId = String.fromEnvironment('FIREBASE_ANDROID_APP_ID');
   static const firebaseIosApiKey = String.fromEnvironment('FIREBASE_IOS_API_KEY');
   static const firebaseIosAppId = String.fromEnvironment('FIREBASE_IOS_APP_ID');
-  static const firebaseIosBundleId = String.fromEnvironment('FIREBASE_IOS_BUNDLE_ID', defaultValue: 'com.amora.amora');
+  static const firebaseIosBundleId = String.fromEnvironment('FIREBASE_IOS_BUNDLE_ID', defaultValue: 'com.woops.app');
 
   // Legal / support links shown in the app.
   static const termsUrl = String.fromEnvironment('TERMS_URL', defaultValue: 'https://example.com/terms');

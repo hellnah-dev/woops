@@ -62,6 +62,8 @@ class MyProfileScreen extends ConsumerWidget {
                   textAlign: TextAlign.center,
                   style: theme.textTheme.headlineSmall,
                 ),
+                if (p.username != null)
+                  Text('@${p.username}', textAlign: TextAlign.center, style: theme.textTheme.bodyLarge),
                 const SizedBox(height: 4),
                 Text(
                   '${(completeness * 100).round()}% complete',
@@ -87,6 +89,21 @@ class MyProfileScreen extends ConsumerWidget {
                       ),
                     ),
                   ],
+                ),
+                const SizedBox(height: AppSpacing.md),
+                Card(
+                  child: ListTile(
+                    leading: Icon(
+                      p.isVerified ? Icons.verified_rounded : Icons.verified_outlined,
+                      color: Colors.blue,
+                    ),
+                    title: Text(p.isVerified ? 'Photo verified' : 'Get verified'),
+                    subtitle: Text(p.isVerified
+                        ? 'Your profile shows a blue badge'
+                        : 'Take a quick selfie to earn a blue badge'),
+                    trailing: p.isVerified ? null : const Icon(Icons.chevron_right_rounded),
+                    onTap: p.isVerified ? null : () => context.push(Routes.verify),
+                  ),
                 ),
                 if (completeness < 1) ...[
                   const SizedBox(height: AppSpacing.lg),

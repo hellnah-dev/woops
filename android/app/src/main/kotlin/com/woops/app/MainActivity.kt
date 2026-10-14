@@ -1,4 +1,4 @@
-package com.amora.amora
+package com.woops.app
 
 import io.flutter.embedding.android.FlutterActivity
 

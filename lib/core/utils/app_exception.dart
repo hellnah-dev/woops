@@ -18,7 +18,7 @@ class AppException implements Exception {
     'profile_missing': 'Finish setting up your profile first.',
     'photo_required': 'Add at least one photo to continue.',
     'photo_limit': 'You can have up to 6 photos.',
-    'underage': 'You must be at least 18 to use Amora.',
+    'underage': 'You must be at least 18 to use Woops.',
     'unavailable': 'This profile is no longer available.',
     'rate_limited': "You're going a little fast. Try again later.",
     'nothing_to_undo': 'There is nothing to undo.',
@@ -29,6 +29,12 @@ class AppException implements Exception {
     'message_too_long': 'That message is too long.',
     'too_many_interests': 'Pick up to 10 interests.',
     'invalid_location': 'We couldn’t read your location.',
+    'username_unavailable': 'That username isn’t available.',
+    'birthdate_mismatch': 'Your birthday must match the one you entered when signing up.',
+    'consent_required': 'Please accept the Terms and Privacy Policy to continue.',
+    'banned': 'This account can’t use Woops.',
+    'already_pending': 'Your verification is already being reviewed.',
+    'already_verified': 'You’re already verified.',
   };
 
   factory AppException.from(Object error) {

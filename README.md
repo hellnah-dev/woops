@@ -1,4 +1,4 @@
-# Amora: a modern dating app (Flutter + Supabase)
+# Woops: a modern dating app (Flutter + Supabase)
 
 One Flutter codebase for **Android and iOS** with a secure Supabase backend:
 email/Apple/Google sign-in, a profile setup wizard, swipe-to-discover with filters,
@@ -34,7 +34,7 @@ Run `flutter doctor` and fix anything marked ✗ before continuing.
    ```
    `db push` runs the files in `supabase/migrations/` in order. Do not edit old migrations; add new ones instead.
 3. **Auth settings** (Dashboard → Authentication):
-   - *URL Configuration* → add `com.amora.amora://login-callback` to **Redirect URLs**.
+   - *URL Configuration* → add `com.woops.app://login-callback` to **Redirect URLs**.
    - *Providers → Email*: keep "Confirm email" ON for production. For quick local testing you can turn it off.
    - Optional: enable **Google** and/or **Apple** providers (follow Supabase's guide for each), then set `ENABLE_GOOGLE_SIGN_IN=true` / `ENABLE_APPLE_SIGN_IN=true` in `.env`.
 4. Deploy the server functions:
@@ -76,7 +76,7 @@ If you forget `--dart-define-from-file=.env`, the app shows a "Configuration mis
 
 ## 5. Push notifications (optional)
 
-1. Create a Firebase project, then add an **Android app** (`com.amora.amora`) and an **iOS app** (`com.amora.amora`).
+1. Create a Firebase project, then add an **Android app** (`com.woops.app`) and an **iOS app** (`com.woops.app`).
 2. Copy the app IDs/API keys into the `FIREBASE_*` values in `.env`. No `google-services.json` is needed.
 3. iOS: in Firebase → Project settings → Cloud Messaging, upload an **APNs auth key** (Apple Developer → Keys). In Xcode → Runner → Signing & Capabilities, add **Push Notifications** and **Background Modes → Remote notifications**.
 4. Firebase → Project settings → Service accounts → *Generate new private key*. Then:
@@ -123,20 +123,20 @@ flutter test integration_test --dart-define-from-file=.env
 ## 8. Release builds
 
 Before your first release:
-- Change the app id `com.amora.amora` to your own: `applicationId` in `android/app/build.gradle.kts`, the bundle id in Xcode, and the URL scheme in `AndroidManifest.xml`, `Info.plist` and `AUTH_REDIRECT_URL`.
+- Change the app id `com.woops.app` to your own: `applicationId` in `android/app/build.gradle.kts`, the bundle id in Xcode, and the URL scheme in `AndroidManifest.xml`, `Info.plist` and `AUTH_REDIRECT_URL`.
 - Point `TERMS_URL`, `PRIVACY_URL`, `GUIDELINES_URL` and `SUPPORT_EMAIL` at real pages. The app stores require a privacy policy.
 - Bump `version:` in `pubspec.yaml` (e.g. `1.0.1+2`) for every store upload.
 
 ### Google Play
 ```bash
-keytool -genkey -v -keystore ~/amora-upload.jks -keyalg RSA -keysize 2048 -validity 10000 -alias upload
+keytool -genkey -v -keystore ~/woops-upload.jks -keyalg RSA -keysize 2048 -validity 10000 -alias upload
 ```
 Create `android/key.properties` (git-ignored):
 ```
 storePassword=...
 keyPassword=...
 keyAlias=upload
-storeFile=/Users/you/amora-upload.jks
+storeFile=/Users/you/woops-upload.jks
 ```
 Then:
 ```bash

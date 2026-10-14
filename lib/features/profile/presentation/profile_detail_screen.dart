@@ -1,8 +1,11 @@
 import 'package:flutter/material.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
 
+import '../../../core/i18n/countries.dart';
+import '../../../core/i18n/units.dart';
 import '../../../core/theme/app_colors.dart';
 import '../../../core/widgets/buttons.dart';
+import '../../../core/widgets/photo_viewer.dart';
 import '../../../core/widgets/profile_photo.dart';
 import '../../../core/widgets/state_views.dart';
 import '../../discovery/data/discovery_repository.dart';
@@ -48,7 +51,7 @@ class ProfileDetailScreen extends ConsumerWidget {
               body: const EmptyState(
                 icon: Icons.person_off_outlined,
                 title: 'Profile unavailable',
-                message: 'This person may have left Amora or is no longer available.',
+                message: 'This person may have left Woops or is no longer available.',
               ),
             )
           : _Body(card: card, actions: actions),
@@ -124,9 +127,23 @@ class _Body extends ConsumerWidget {
                     TextSpan(children: [
                       TextSpan(text: card.displayName),
                       TextSpan(text: ', ${card.age}', style: const TextStyle(fontWeight: FontWeight.w400)),
+                      if (card.isVerified)
+                        const WidgetSpan(
+                          alignment: PlaceholderAlignment.middle,
+                          child: Padding(
+                            padding: EdgeInsets.only(left: 8),
+                            child: Tooltip(
+                              message: 'Photo verified',
+                              child: Icon(Icons.verified_rounded, color: Colors.blue, size: 26),
+                            ),
+                          ),
+                        ),
                     ]),
                     style: theme.textTheme.headlineMedium,
                   ),
+                  if (card.username != null)
+                    Text('@${card.username}',
+                        style: theme.textTheme.bodyLarge?.copyWith(color: theme.colorScheme.onSurfaceVariant)),
                   const SizedBox(height: AppSpacing.sm),
                   Wrap(
                     spacing: 16,
@@ -134,8 +151,16 @@ class _Body extends ConsumerWidget {
                     children: [
                       _Fact(icon: Icons.person_outline_rounded, text: card.gender.label),
                       if ((card.jobTitle ?? '').isNotEmpty) _Fact(icon: Icons.work_outline_rounded, text: card.jobTitle!),
-                      if ((card.city ?? '').isNotEmpty) _Fact(icon: Icons.location_city_rounded, text: card.city!),
-                      if (card.distanceKm != null) _Fact(icon: Icons.near_me_outlined, text: '${card.distanceKm} km away'),
+                      if ((card.city ?? '').isNotEmpty || countryByCode(card.countryCode) != null)
+                        _Fact(
+                          icon: Icons.location_city_rounded,
+                          text: [
+                            if ((card.city ?? '').isNotEmpty) card.city!,
+                            if (countryByCode(card.countryCode) case final c?) '${c.flag} ${c.name}',
+                          ].join(', '),
+                        ),
+                      if (card.distanceKm != null)
+                        _Fact(icon: Icons.near_me_outlined, text: DistanceUnits.away(card.distanceKm!)),
                     ],
                   ),
                   const SizedBox(height: AppSpacing.lg),
@@ -217,7 +242,10 @@ class _PhotoPagerState extends State<_PhotoPager> {
         PageView.builder(
           itemCount: photos.isEmpty ? 1 : photos.length,
           onPageChanged: (i) => setState(() => _index = i),
-          itemBuilder: (_, i) => ProfilePhoto(storagePath: photos.isEmpty ? null : photos[i], memCacheWidth: 1080),
+          itemBuilder: (context, i) => GestureDetector(
+            onTap: photos.isEmpty ? null : () => showPhotoViewer(context, photos: photos, initialIndex: i),
+            child: ProfilePhoto(storagePath: photos.isEmpty ? null : photos[i], memCacheWidth: 1080),
+          ),
         ),
         const IgnorePointer(
           child: DecoratedBox(

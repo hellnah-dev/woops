@@ -7,7 +7,7 @@
 	<key>CFBundleDevelopmentRegion</key>
 	<string>$(DEVELOPMENT_LANGUAGE)</string>
 	<key>CFBundleDisplayName</key>
-	<string>Amora</string>
+	<string>Woops</string>
 	<key>CFBundleExecutable</key>
 	<string>$(EXECUTABLE_NAME)</string>
 	<key>CFBundleIdentifier</key>
@@ -15,7 +15,7 @@
 	<key>CFBundleInfoDictionaryVersion</key>
 	<string>6.0</string>
 	<key>CFBundleName</key>
-	<string>Amora</string>
+	<string>Woops</string>
 	<key>CFBundlePackageType</key>
 	<string>APPL</string>
 	<key>CFBundleShortVersionString</key>
@@ -28,10 +28,10 @@
 			<key>CFBundleTypeRole</key>
 			<string>Editor</string>
 			<key>CFBundleURLName</key>
-			<string>com.amora.amora.auth</string>
+			<string>com.woops.app.auth</string>
 			<key>CFBundleURLSchemes</key>
 			<array>
-				<string>com.amora.amora</string>
+				<string>com.woops.app</string>
 			</array>
 		</dict>
 	</array>
@@ -47,11 +47,11 @@
 	<key>LSRequiresIPhoneOS</key>
 	<true/>
 	<key>NSCameraUsageDescription</key>
-	<string>Amora uses the camera so you can take profile photos.</string>
+	<string>Woops uses the camera so you can take profile photos.</string>
 	<key>NSLocationWhenInUseUsageDescription</key>
-	<string>Amora uses your approximate location to show people near you. Your exact location is never shared.</string>
+	<string>Woops uses your approximate location to show people near you. Your exact location is never shared.</string>
 	<key>NSPhotoLibraryUsageDescription</key>
-	<string>Amora needs access to your photos so you can add them to your profile.</string>
+	<string>Woops needs access to your photos so you can add them to your profile.</string>
 	<key>UIApplicationSceneManifest</key>
 	<dict>
 		<key>UIApplicationSupportsMultipleScenes</key>

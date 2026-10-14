@@ -1,7 +1,7 @@
 # Supabase CLI configuration (used by `supabase start` / `supabase db push` /
 # `supabase functions deploy`). Hosted project settings (redirect URLs,
 # providers) must ALSO be set in the Supabase dashboard; see README.
-project_id = "amora"
+project_id = "woops"
 
 [api]
 enabled = true
@@ -16,8 +16,8 @@ major_version = 17
 
 [auth]
 enabled = true
-site_url = "com.amora.amora://login-callback"
-additional_redirect_urls = ["com.amora.amora://login-callback"]
+site_url = "com.woops.app://login-callback"
+additional_redirect_urls = ["com.woops.app://login-callback"]
 jwt_expiry = 3600
 enable_signup = true
 

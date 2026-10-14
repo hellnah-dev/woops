@@ -5,7 +5,7 @@
 // It signs up a brand-new throwaway account, so turn OFF "Confirm email" in
 // Supabase → Authentication → Providers → Email on your DEV project first
 // (or the test stops at the "Check your email" step).
-import 'package:amora/main.dart' as app;
+import 'package:woops/main.dart' as app;
 import 'package:flutter/material.dart';
 import 'package:flutter_test/flutter_test.dart';
 import 'package:integration_test/integration_test.dart';

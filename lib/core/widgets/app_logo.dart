@@ -12,7 +12,7 @@ class AppLogo extends StatelessWidget {
   const AppLogo({super.key, this.size = 96, this.showWordmark = false});
 
   static const assetPath = 'assets/branding/logo.png';
-  static const appName = 'Amora';
+  static const appName = 'Woops';
 
   final double size;
   final bool showWordmark;

@@ -1,10 +1,10 @@
 import 'dart:async';
 
-import 'package:amora/features/chat/data/chat_repository.dart';
-import 'package:amora/features/chat/domain/chat_models.dart';
-import 'package:amora/features/discovery/data/discovery_repository.dart';
-import 'package:amora/features/profile/domain/profile_enums.dart';
-import 'package:amora/features/profile/domain/profile_models.dart';
+import 'package:woops/features/chat/data/chat_repository.dart';
+import 'package:woops/features/chat/domain/chat_models.dart';
+import 'package:woops/features/discovery/data/discovery_repository.dart';
+import 'package:woops/features/profile/domain/profile_enums.dart';
+import 'package:woops/features/profile/domain/profile_models.dart';
 import 'package:supabase_flutter/supabase_flutter.dart';
 
 ProfileCard card(String id, {String? name, int age = 27}) => ProfileCard(

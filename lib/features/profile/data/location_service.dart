@@ -24,7 +24,7 @@ class LocationService {
     }
     if (permission == LocationPermission.deniedForever) {
       throw const AppException(
-        'Location is blocked for Amora. Enable it in Settings to see people nearby.',
+        'Location is blocked for Woops. Enable it in Settings to see people nearby.',
         code: 'location_denied_forever',
       );
     }

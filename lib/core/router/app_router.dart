@@ -9,6 +9,7 @@ import '../../features/auth/presentation/welcome_screen.dart';
 import '../../features/chat/presentation/chat_screen.dart';
 import '../../features/chat/presentation/conversations_screen.dart';
 import '../../features/discovery/presentation/discover_screen.dart';
+import '../../features/legal/legal_screen.dart';
 import '../../features/likes/presentation/likes_screen.dart';
 import '../../features/matches/presentation/matches_screen.dart';
 import '../../features/onboarding/presentation/onboarding_screen.dart';
@@ -17,6 +18,7 @@ import '../../features/profile/domain/profile_models.dart';
 import '../../features/profile/presentation/edit_profile_screen.dart';
 import '../../features/profile/presentation/my_profile_screen.dart';
 import '../../features/profile/presentation/profile_detail_screen.dart';
+import '../../features/profile/presentation/verification_screen.dart';
 import '../../features/settings/presentation/settings_screens.dart';
 import '../supabase/supabase_providers.dart';
 import 'home_shell.dart';
@@ -36,6 +38,7 @@ class Routes {
   static const chats = '/chats';
   static const profile = '/profile';
   static const editProfile = '/profile/edit';
+  static const verify = '/profile/verify';
   static const settings = '/settings';
   static const notificationSettings = '/settings/notifications';
   static const privacySettings = '/settings/privacy';
@@ -79,6 +82,8 @@ class _RouterRefresh extends ChangeNotifier {
 
   String? redirect(BuildContext context, GoRouterState state) {
     final loc = state.matchedLocation;
+    // Legal documents are readable by everyone, signed in or not.
+    if (loc.startsWith('/legal/')) return null;
     final signedIn = _ref.read(supabaseClientProvider).auth.currentSession != null;
 
     if (!signedIn) return Routes._signedOut.contains(loc) ? null : Routes.welcome;
@@ -120,6 +125,11 @@ final routerProvider = Provider<GoRouter>((ref) {
         builder: (_, _) => ResetPasswordScreen(onDone: refresh.passwordResetDone),
       ),
       GoRoute(path: Routes.onboarding, builder: (_, _) => const OnboardingScreen()),
+      GoRoute(
+        path: '/legal/:doc',
+        parentNavigatorKey: rootNavigatorKey,
+        builder: (_, state) => LegalScreen(doc: LegalDoc.fromSlug(state.pathParameters['doc']!) ?? LegalDoc.terms),
+      ),
       StatefulShellRoute.indexedStack(
         builder: (context, state, shell) => HomeShell(shell: shell),
         branches: [
@@ -129,6 +139,11 @@ final routerProvider = Provider<GoRouter>((ref) {
           StatefulShellBranch(routes: [GoRoute(path: Routes.chats, builder: (_, _) => const ConversationsScreen())]),
           StatefulShellBranch(routes: [GoRoute(path: Routes.profile, builder: (_, _) => const MyProfileScreen())]),
         ],
+      ),
+      GoRoute(
+        path: Routes.verify,
+        parentNavigatorKey: rootNavigatorKey,
+        builder: (_, _) => const VerificationScreen(),
       ),
       GoRoute(
         path: Routes.editProfile,

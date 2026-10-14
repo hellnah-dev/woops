@@ -1,5 +1,5 @@
 -- =============================================================================
--- Amora core schema
+-- Woops core schema
 -- Tables, constraints, indexes and integrity triggers.
 -- Security (RLS, grants) lives in 20261014000003_security.sql.
 -- =============================================================================

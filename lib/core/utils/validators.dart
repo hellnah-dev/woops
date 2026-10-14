@@ -29,6 +29,18 @@ class Validators {
     return null;
   }
 
+  static final _username = RegExp(r'^[a-zA-Z0-9_.]{3,20}$');
+
+  /// Mirrors the database rule: 3–20 letters, numbers, "_" or ".".
+  static String? username(String? value) {
+    final v = value?.trim() ?? '';
+    if (v.isEmpty) return 'Choose a username';
+    if (v.length < 3) return 'Use at least 3 characters';
+    if (v.length > 20) return 'Use 20 characters or fewer';
+    if (!_username.hasMatch(v)) return 'Only letters, numbers, _ and . are allowed';
+    return null;
+  }
+
   static String? maxLength(String? value, int max, {String? label}) {
     if ((value ?? '').length > max) return '${label ?? 'This'} must be $max characters or fewer';
     return null;

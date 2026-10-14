@@ -129,7 +129,7 @@ class _MatchTile extends StatelessWidget {
             child: Stack(
               fit: StackFit.expand,
               children: [
-                ProfilePhoto(storagePath: summary.otherPhoto, memCacheWidth: 450),
+                ProfilePhoto(storagePath: summary.otherPhoto, thumbnail: true, memCacheWidth: 450),
                 const DecoratedBox(decoration: BoxDecoration(gradient: AppColors.photoScrim)),
                 Positioned(
                   left: 10,

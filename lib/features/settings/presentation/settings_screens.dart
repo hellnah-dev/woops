@@ -11,6 +11,7 @@ import '../../../core/widgets/state_views.dart';
 import '../../auth/data/auth_repository.dart';
 import '../../discovery/application/discovery_controller.dart';
 import '../../discovery/presentation/filters_sheet.dart';
+import '../../legal/legal_screen.dart';
 import '../../notifications/push_service.dart';
 import '../../profile/data/location_service.dart';
 import '../../safety/data/safety_repository.dart';
@@ -98,26 +99,23 @@ class SettingsScreen extends ConsumerWidget {
           ListTile(
             leading: const Icon(Icons.shield_outlined),
             title: const Text('Community guidelines'),
-            trailing: const Icon(Icons.open_in_new_rounded, size: 18),
-            onTap: () => _open(context, Env.guidelinesUrl),
+            onTap: () => openLegal(context, LegalDoc.guidelines),
           ),
           ListTile(
             leading: const Icon(Icons.privacy_tip_outlined),
             title: const Text('Privacy policy'),
-            trailing: const Icon(Icons.open_in_new_rounded, size: 18),
-            onTap: () => _open(context, Env.privacyUrl),
+            onTap: () => openLegal(context, LegalDoc.privacy),
           ),
           ListTile(
             leading: const Icon(Icons.description_outlined),
             title: const Text('Terms of service'),
-            trailing: const Icon(Icons.open_in_new_rounded, size: 18),
-            onTap: () => _open(context, Env.termsUrl),
+            onTap: () => openLegal(context, LegalDoc.terms),
           ),
           ListTile(
             leading: const Icon(Icons.help_outline_rounded),
             title: const Text('Help & support'),
             subtitle: const Text(Env.supportEmail),
-            onTap: () => _open(context, 'mailto:${Env.supportEmail}?subject=Amora%20support'),
+            onTap: () => _open(context, 'mailto:${Env.supportEmail}?subject=Woops%20support'),
           ),
           const _Header(''),
           ListTile(

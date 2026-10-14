@@ -1,6 +1,6 @@
-import 'package:amora/features/chat/domain/chat_models.dart';
-import 'package:amora/features/profile/domain/profile_enums.dart';
-import 'package:amora/features/profile/domain/profile_models.dart';
+import 'package:woops/features/chat/domain/chat_models.dart';
+import 'package:woops/features/profile/domain/profile_enums.dart';
+import 'package:woops/features/profile/domain/profile_models.dart';
 import 'package:flutter_test/flutter_test.dart';
 
 import '../helpers/fakes.dart';

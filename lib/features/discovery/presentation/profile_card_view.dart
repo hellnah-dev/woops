@@ -1,5 +1,7 @@
 import 'package:flutter/material.dart';
 
+import '../../../core/i18n/countries.dart';
+import '../../../core/i18n/units.dart';
 import '../../../core/theme/app_colors.dart';
 import '../../../core/widgets/profile_photo.dart';
 import '../../profile/domain/profile_models.dart';
@@ -90,6 +92,15 @@ class _ProfileCardViewState extends State<ProfileCardView> {
                               TextSpan(children: [
                                 TextSpan(text: card.displayName),
                                 TextSpan(text: '  ${card.age}', style: const TextStyle(fontWeight: FontWeight.w400)),
+                                if (card.isVerified)
+                                  const WidgetSpan(
+                                    alignment: PlaceholderAlignment.middle,
+                                    child: Padding(
+                                      padding: EdgeInsets.only(left: 6),
+                                      child: Icon(Icons.verified_rounded, color: Colors.lightBlueAccent, size: 24,
+                                          semanticLabel: 'Photo verified'),
+                                    ),
+                                  ),
                               ]),
                               maxLines: 1,
                               overflow: TextOverflow.ellipsis,
@@ -102,7 +113,9 @@ class _ProfileCardViewState extends State<ProfileCardView> {
                               children: [
                                 _Pill(text: '${card.intention.emoji} ${card.intention.label}'),
                                 if (card.distanceKm != null)
-                                  _Pill(icon: Icons.near_me_rounded, text: '${card.distanceKm} km away'),
+                                  _Pill(icon: Icons.near_me_rounded, text: DistanceUnits.away(card.distanceKm!)),
+                                if (countryByCode(card.countryCode) case final c?)
+                                  _Pill(text: '${c.flag} ${card.city?.isNotEmpty == true ? card.city! : c.name}'),
                                 if ((card.jobTitle ?? '').isNotEmpty)
                                   _Pill(icon: Icons.work_outline_rounded, text: card.jobTitle!),
                               ],

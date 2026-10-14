@@ -65,6 +65,7 @@ update public.discovery_preferences set genders = array['man'];
 select public.set_my_interests(array(select id from public.interests where name in ('Hiking', 'Coffee', 'Travel')));
 select public.set_my_location(27.717245, 85.323961);
 select tests.ok((select lat = 27.72 and lng = 85.32 from public.profile_locations), 'location is stored rounded (~1 km)');
+select public.accept_legal_documents('2026-10-14');
 select public.complete_onboarding();
 select tests.ok((select onboarding_completed from public.profiles), 'onboarding completes with a photo');
 
@@ -73,18 +74,21 @@ insert into public.profiles (id, display_name, birthdate, gender) values (:B, 'B
 insert into public.profile_photos (user_id, storage_path) values (:B, 'bbbbbbbb-0000-0000-0000-000000000002/1.jpg');
 update public.discovery_preferences set genders = array['woman'];
 select public.set_my_location(27.70, 85.30);
+select public.accept_legal_documents('2026-10-14');
 select public.complete_onboarding();
 
 select tests.login(:C);
 insert into public.profiles (id, display_name, birthdate, gender) values (:C, 'Chris', current_date - interval '31 years', 'man');
 insert into public.profile_photos (user_id, storage_path) values (:C, 'cccccccc-0000-0000-0000-000000000003/1.jpg');
 update public.discovery_preferences set genders = array['woman'];
+select public.accept_legal_documents('2026-10-14');
 select public.complete_onboarding();
 
 select tests.login(:D);
 insert into public.profiles (id, display_name, birthdate, gender) values (:D, 'Dina', current_date - interval '25 years', 'woman');
 insert into public.profile_photos (user_id, storage_path) values (:D, 'dddddddd-0000-0000-0000-000000000004/1.jpg');
 update public.discovery_preferences set genders = array['woman'];
+select public.accept_legal_documents('2026-10-14');
 select public.complete_onboarding();
 
 -- -----------------------------------------------------------------------------
@@ -247,6 +251,189 @@ select tests.throws($q$select public.send_message(current_setting('test.conv')::
 select tests.ok(not exists (select 1 from public.public_profiles where id = :B), 'blocked profile disappears from public_profiles');
 select tests.ok((select count(*) from public.get_blocked_users()) = 1, 'A sees who she blocked');
 
+reset role;
+
+-- -----------------------------------------------------------------------------
+-- Age gate, legal consent, verification flag
+-- -----------------------------------------------------------------------------
+\set F '''ffffffff-0000-0000-0000-000000000006'''
+\set G '''99999999-0000-0000-0000-000000000007'''
+\set H '''88888888-0000-0000-0000-000000000008'''
+insert into auth.users (id, email, raw_user_meta_data) values
+  (:F, 'f@test.dev', '{"birthdate": "2000-01-01"}'),
+  (:G, 'g@test.dev', '{}'),
+  (:H, 'h@test.dev', '{}');
+
+set role authenticated;
+select tests.login(:F);
+select tests.throws($q$insert into public.profiles (id, display_name, birthdate, gender)
+                       values ('ffffffff-0000-0000-0000-000000000006', 'Fay', '1990-01-01', 'woman')$q$,
+                    '%birthdate_mismatch%', 'birthdate must match the sign-up age gate');
+insert into public.profiles (id, display_name, birthdate, gender, country_code)
+values (:F, 'Fay', '2000-01-01', 'woman', 'NP');
+insert into public.profile_photos (user_id, storage_path) values (:F, 'ffffffff-0000-0000-0000-000000000006/1.jpg');
+select tests.throws('select public.complete_onboarding()', '%consent_required%', 'onboarding requires accepting terms/privacy/18+');
+select tests.throws($q$select public.accept_legal_documents('1999-01-01')$q$, '%outdated_terms%', 'outdated legal version is rejected');
+select tests.ok(not public.has_accepted_legal(), 'has_accepted_legal is false before consent');
+select public.accept_legal_documents('2026-10-14');
+select tests.ok(public.has_accepted_legal(), 'has_accepted_legal is true after consent');
+select public.complete_onboarding();
+select tests.throws($q$update public.profiles set is_verified = true$q$, '%permission denied%', 'cannot self-verify');
+select tests.throws($q$update public.profiles set country_code = 'Nepal'$q$, '%check%', 'country code must be ISO alpha-2');
+select tests.throws($q$insert into public.legal_acceptances (user_id, document, version)
+                       values ('ffffffff-0000-0000-0000-000000000006', 'terms', 'x')$q$,
+                    '%permission denied%', 'consent rows cannot be forged directly');
+
+-- -----------------------------------------------------------------------------
+-- Worldwide discovery: countries, "Anywhere", across the 180° meridian
+-- -----------------------------------------------------------------------------
+select tests.login(:G);  -- Gita in Suva, Fiji (178.4 E)
+insert into public.profiles (id, display_name, birthdate, gender, country_code)
+values (:G, 'Gita', current_date - interval '28 years', 'woman', 'FJ');
+insert into public.profile_photos (user_id, storage_path) values (:G, '99999999-0000-0000-0000-000000000007/1.jpg');
+update public.discovery_preferences set genders = array['man'], max_distance_km = 300;
+select public.set_my_location(-18.14, 178.44);
+select public.accept_legal_documents('2026-10-14');
+select public.complete_onboarding();
+
+select tests.login(:H);  -- Hemi on Taveuni side, just across the meridian (179.9 W)
+insert into public.profiles (id, display_name, birthdate, gender, country_code)
+values (:H, 'Hemi', current_date - interval '30 years', 'man', 'FJ');
+insert into public.profile_photos (user_id, storage_path) values (:H, '88888888-0000-0000-0000-000000000008/1.jpg');
+update public.discovery_preferences set genders = array['woman'], max_distance_km = 300;
+select public.set_my_location(-16.80, -179.95);
+select public.accept_legal_documents('2026-10-14');
+select public.complete_onboarding();
+
+select tests.login(:G);
+select tests.ok(exists (select 1 from public.get_discovery_feed(20) where id = :H),
+                'distance works across the 180° meridian');
+select tests.ok((select country_code from public.get_discovery_feed(20) where id = :H) = 'FJ',
+                'feed includes country code');
+update public.discovery_preferences set country_codes = array['NP'];
+select tests.ok(not exists (select 1 from public.get_discovery_feed(20) where id = :H),
+                'country filter excludes other countries');
+update public.discovery_preferences set country_codes = array['FJ'];
+select tests.ok(exists (select 1 from public.get_discovery_feed(20) where id = :H),
+                'country filter includes chosen country');
+select tests.throws($q$update public.discovery_preferences set country_codes = array['fiji']$q$,
+                    '%check%', 'country filter only accepts ISO codes');
+
+select tests.login(:C);  -- Chris (man, no location) wants women; Anywhere.
+update public.discovery_preferences set max_distance_km = 20000;
+select tests.ok(exists (select 1 from public.get_discovery_feed(20) where id = :G),
+                '"Anywhere" shows people in other countries');
+
+-- -----------------------------------------------------------------------------
+-- Two different "under 18" reports hide the profile pending review
+-- -----------------------------------------------------------------------------
+select tests.login(:B);
+select public.report_user(:F, 'underage');
+reset role;
+select tests.ok((select status from public.profiles where id = :F) = 'active', 'one underage report does not suspend');
+set role authenticated;
+select tests.login(:C);
+select public.report_user(:F, 'underage');
+reset role;
+select tests.ok((select status from public.profiles where id = :F) = 'suspended',
+                'two underage reports from different people suspend the profile');
+
+-- -----------------------------------------------------------------------------
+-- Country age rules (floor 18), admin panel permissions, verification, errors
+-- -----------------------------------------------------------------------------
+\set K '''77777777-0000-0000-0000-000000000009'''
+\set Z '''00000000-0000-0000-0000-00000000ad01'''
+insert into auth.users (id, email) values (:K, 'kim@test.dev'), (:Z, 'admin@test.dev');
+insert into public.admins (user_id) values (:Z);
+
+set role anon;
+select tests.login(null);
+select tests.ok(public.min_age_for_country('KR') = 19, 'anon can read the minimum age for a country');
+select tests.ok(public.min_age_for_country('NP') = 18, 'default minimum age is 18');
+select public.log_client_error('Crash on welcome screen', 'stack…', '{"screen":"welcome"}', 'android', '1.0.0');
+select tests.throws('select public.admin_stats()', '%permission denied%', 'anon cannot call admin functions');
+
+set role authenticated;
+select tests.login(:K);
+select tests.throws($q$insert into public.profiles (id, display_name, birthdate, gender, country_code)
+                       values ('77777777-0000-0000-0000-000000000009', 'Kim', current_date - interval '18 years 2 months', 'man', 'KR')$q$,
+                    '%at least 19%', 'country minimum age (KR 19) is enforced');
+insert into public.profiles (id, display_name, birthdate, gender, country_code)
+values (:K, 'Kim', current_date - interval '18 years 2 months', 'man', 'NP');
+select tests.throws($q$update public.profiles set country_code = 'KR'$q$,
+                    '%at least 19%', 'switching country re-checks the age rule');
+select public.log_client_error('Null check operator used on a null value', 'at chat_screen.dart:120', '{}', 'ios', '1.0.0');
+
+select tests.throws('select public.admin_stats()', '%forbidden%', 'regular users cannot call admin_stats');
+select tests.throws($q$select public.admin_set_user_status('bbbbbbbb-0000-0000-0000-000000000002', 'banned')$q$,
+                    '%forbidden%', 'regular users cannot ban people');
+select tests.throws($q$select public.admin_upsert_age_rule('NP', 18)$q$, '%forbidden%', 'regular users cannot edit age rules');
+select tests.ok((select count(*) from public.app_errors) = 0, 'regular users cannot read error reports');
+select tests.ok((select count(*) from public.admin_actions) = 0, 'regular users cannot read the audit log');
+select tests.throws($q$insert into public.admins (user_id) values ('77777777-0000-0000-0000-000000000009')$q$,
+                    '%permission denied%', 'users cannot make themselves admin');
+
+-- Verification request (B is an active user)
+select tests.login(:B);
+select tests.throws($q$select public.request_verification('aaaaaaaa-0000-0000-0000-000000000001/selfie.jpg')$q$,
+                    '%check%', 'selfie must be in your own folder');
+select public.request_verification('bbbbbbbb-0000-0000-0000-000000000002/selfie.jpg');
+select tests.throws($q$select public.request_verification('bbbbbbbb-0000-0000-0000-000000000002/selfie2.jpg')$q$,
+                    '%already_pending%', 'only one pending verification at a time');
+select tests.login(:C);
+select tests.ok((select count(*) from public.verification_requests) = 0, 'users cannot see others'' verification requests');
+
+-- Admin
+select tests.login(:Z);
+select tests.ok(public.is_admin(), 'admin is recognised');
+select tests.ok((public.admin_stats() ->> 'verifications_pending')::int = 1, 'admin_stats counts pending verifications');
+select tests.ok((select count(*) from public.admin_search_users('bikash')) = 1, 'admin can search users by name');
+select tests.ok((public.admin_get_user(:B) -> 'profile' ->> 'email') = 'b@test.dev', 'admin can examine a user');
+select tests.ok((select count(*) from public.admin_list_errors()) = 2, 'admin sees grouped app errors');
+select public.admin_review_verification((select id from public.admin_list_verifications() limit 1), true);
+select tests.ok((public.admin_get_user(:B) -> 'profile' ->> 'is_verified')::boolean, 'approving verification marks the user verified');
+select tests.ok((select count(*) from public.admin_list_reports('open')) >= 1, 'admin sees open reports');
+select public.admin_resolve_report((select id from public.admin_list_reports('open') where reported_id = :C limit 1),
+                                   'actioned', 'suspended', 'spam links');
+select tests.ok((public.admin_get_user(:C) -> 'profile' ->> 'status') = 'suspended', 'admin can suspend through a report');
+select tests.throws($q$select public.admin_upsert_age_rule('NP', 16)$q$, '%never be below 18%', 'age rule can never go below 18');
+select public.admin_upsert_age_rule('np', 19, 'test');
+select tests.ok(public.min_age_for_country('NP') = 19, 'admin can raise a country''s minimum age');
+select public.admin_delete_age_rule('NP');
+select tests.ok((select count(*) from public.admin_actions where admin_id = :Z) >= 4, 'admin actions are written to the audit log');
+select public.admin_set_user_status(:C, 'active', 'appeal accepted');
+reset role;
+
+-- -----------------------------------------------------------------------------
+-- Usernames and hashed ban list
+-- -----------------------------------------------------------------------------
+\set L '''66666666-0000-0000-0000-00000000000a'''
+insert into auth.users (id, email) values (:L, 'KIM@Test.dev');  -- same person as K, different casing
+set role authenticated;
+select tests.login(:A);
+update public.profiles set username = 'Asha_K';
+select tests.ok((select username from public.profiles) = 'asha_k', 'usernames are stored lowercase');
+select tests.login(:B);
+select tests.ok(not public.is_username_available('ASHA_K'), 'taken username is unavailable (case-insensitive)');
+select tests.ok(public.is_username_available('bikash.np'), 'free username is available');
+select tests.ok(not public.is_username_available('admin'), 'reserved usernames are unavailable');
+select tests.ok(not public.is_username_available('no spaces!'), 'invalid usernames are unavailable');
+select tests.throws($q$update public.profiles set username = 'asha_k'$q$, '%duplicate%', 'duplicate usernames are rejected');
+select tests.throws($q$update public.profiles set username = 'support'$q$, '%reserved%', 'reserved usernames are rejected');
+select tests.login(:K);
+update public.profiles set username = 'kim99';
+select tests.login(:Z);
+select public.admin_set_user_status(:K, 'banned', 'scam');
+reset role;
+select tests.ok((select count(*) from public.banned_identifiers) = 2, 'ban stores hashed email + username');
+select tests.ok(not exists (select 1 from public.banned_identifiers where hash like '%kim%'), 'ban list holds hashes, not plain text');
+set role authenticated;
+select tests.throws('select count(*) from public.banned_identifiers', '%permission denied%', 'clients cannot read the ban list');
+select tests.login(:L);
+select tests.throws($q$insert into public.profiles (id, display_name, birthdate, gender)
+                       values ('66666666-0000-0000-0000-00000000000a', 'Kim again', '1995-01-01', 'man')$q$,
+                    '%banned%', 'banned email cannot sign up again');
+select tests.ok(not public.is_username_available('KIM99'), 'banned username cannot be reused');
 reset role;
 
 -- -----------------------------------------------------------------------------

@@ -3,6 +3,7 @@ import 'package:flutter_riverpod/flutter_riverpod.dart';
 import 'package:image_picker/image_picker.dart';
 
 import '../../../core/theme/app_colors.dart';
+import '../../../core/widgets/photo_viewer.dart';
 import '../../../core/widgets/profile_photo.dart';
 import '../../../core/widgets/state_views.dart';
 import '../application/profile_providers.dart';
@@ -55,7 +56,7 @@ class _PhotoGridEditorState extends ConsumerState<PhotoGridEditor> {
         showSnack(
           context,
           'Couldn’t open your ${source == ImageSource.camera ? 'camera' : 'photos'}. '
-          'Check Amora’s permissions in Settings.',
+          'Check Woops’s permissions in Settings.',
           isError: true,
         );
       }
@@ -82,6 +83,11 @@ class _PhotoGridEditorState extends ConsumerState<PhotoGridEditor> {
         child: Column(
           mainAxisSize: MainAxisSize.min,
           children: [
+            ListTile(
+              leading: const Icon(Icons.zoom_out_map_rounded),
+              title: const Text('View photo'),
+              onTap: () => Navigator.pop(context, 'view'),
+            ),
             if (!isMain)
               ListTile(
                 leading: const Icon(Icons.star_outline_rounded),
@@ -98,6 +104,11 @@ class _PhotoGridEditorState extends ConsumerState<PhotoGridEditor> {
       ),
     );
     if (action == null || !mounted) return;
+    if (action == 'view') {
+      await showPhotoViewer(context,
+          photos: photos.map((p) => p.storagePath).toList(), initialIndex: photos.indexOf(photo));
+      return;
+    }
 
     final repo = ref.read(profileRepositoryProvider);
     setState(() => _busyId = photo.id);
@@ -150,6 +161,7 @@ class _PhotoGridEditorState extends ConsumerState<PhotoGridEditor> {
                 children: [
                   ProfilePhoto(
                     storagePath: photo.storagePath,
+                    thumbnail: true,
                     borderRadius: BorderRadius.circular(AppRadius.md),
                     memCacheWidth: 400,
                   ),

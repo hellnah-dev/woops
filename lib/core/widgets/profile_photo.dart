@@ -3,6 +3,7 @@ import 'package:flutter/material.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
 
 import '../supabase/supabase_providers.dart';
+import '../utils/image_processing.dart';
 
 /// Loads a photo from the private `profile-photos` bucket with caching.
 /// The cache key is the storage path, so refreshed auth tokens do not cause
@@ -14,9 +15,13 @@ class ProfilePhoto extends ConsumerWidget {
     this.fit = BoxFit.cover,
     this.borderRadius,
     this.memCacheWidth,
+    this.thumbnail = false,
   });
 
   final String? storagePath;
+
+  /// Load the small 480 px version (falls back to the full photo if missing).
+  final bool thumbnail;
   final BoxFit fit;
   final BorderRadius? borderRadius;
 
@@ -38,15 +43,18 @@ class ProfilePhoto extends ConsumerWidget {
       child = placeholder;
     } else {
       final resolver = ref.watch(photoUrlResolverProvider);
+      final key = thumbnail ? thumbnailPathFor(path) : path;
       child = CachedNetworkImage(
-        imageUrl: resolver.url(path),
-        cacheKey: path,
+        imageUrl: resolver.url(key),
+        cacheKey: key,
         httpHeaders: resolver.headers,
         fit: fit,
         memCacheWidth: memCacheWidth,
         fadeInDuration: const Duration(milliseconds: 180),
         placeholder: (context, url) => Container(color: scheme.surfaceContainerHighest),
-        errorWidget: (context, url, error) => Container(
+        errorWidget: (context, url, error) => thumbnail
+            ? ProfilePhoto(storagePath: path, fit: fit, memCacheWidth: memCacheWidth)
+            : Container(
           color: scheme.surfaceContainerHighest,
           alignment: Alignment.center,
           child: Icon(Icons.broken_image_outlined, color: scheme.onSurfaceVariant),
@@ -72,7 +80,7 @@ class ProfileAvatar extends StatelessWidget {
       width: size,
       height: size,
       child: ClipOval(
-        child: ProfilePhoto(storagePath: storagePath, memCacheWidth: (size * 3).round()),
+        child: ProfilePhoto(storagePath: storagePath, thumbnail: true, memCacheWidth: (size * 3).round()),
       ),
     );
     if (!ring) return photo;

@@ -2,12 +2,15 @@ import 'package:flutter/material.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
 import 'package:intl/intl.dart';
 
+import '../../../core/i18n/countries.dart';
 import '../../../core/theme/app_colors.dart';
 import '../../../core/utils/app_exception.dart';
 import '../../../core/utils/validators.dart';
 import '../../../core/widgets/buttons.dart';
+import '../../../core/widgets/country_picker.dart';
 import '../../../core/widgets/state_views.dart';
 import '../../auth/data/auth_repository.dart';
+import '../../legal/legal_screen.dart';
 import '../../profile/application/profile_providers.dart';
 import '../../profile/data/location_service.dart';
 import '../../profile/data/profile_repository.dart';
@@ -15,12 +18,15 @@ import '../../profile/domain/profile_enums.dart';
 import '../../profile/domain/profile_models.dart';
 import '../../profile/presentation/photo_grid_editor.dart';
 import '../../profile/presentation/profile_field_widgets.dart';
+import '../../profile/presentation/username_field.dart';
 
-enum _Step { name, birthday, gender, interestedIn, intention, interests, photos, about, location }
+enum _Step { consent, name, place, birthday, gender, interestedIn, intention, interests, photos, about, location }
 
-/// Profile setup wizard. The profile row is created after the "interests"
-/// step; photos are uploaded straight away; onboarding is marked complete on
-/// the server (which checks for a photo) at the end.
+/// Profile setup wizard.
+///  * consent: shown only if the legal documents haven't been accepted yet
+///    (e.g. Apple/Google sign-in skipped the sign-up form)
+///  * the profile row is created after "interests"; photos upload straight away
+///  * onboarding is marked complete on the server, which checks photo + consent
 class OnboardingScreen extends ConsumerStatefulWidget {
   const OnboardingScreen({super.key});
 
@@ -30,42 +36,89 @@ class OnboardingScreen extends ConsumerStatefulWidget {
 
 class _OnboardingScreenState extends ConsumerState<OnboardingScreen> {
   final _name = TextEditingController();
+  final _city = TextEditingController();
   final _bio = TextEditingController();
+  String _username = '';
+  bool _usernameOk = false;
   DateTime? _birthdate;
+  bool _birthdateLocked = false;
+  String? _country;
+  int _minAge = 18;
   Gender? _gender;
   Set<Gender> _interestedIn = {};
   Intention? _intention;
   Set<int> _interestIds = {};
   List<ProfilePrompt> _prompts = [];
+  bool _consentAdult = false;
+  bool _consentTerms = false;
 
-  var _step = _Step.name;
+  List<_Step>? _steps;
+  int _index = 0;
   bool _busy = false;
   bool _profileCreated = false;
+
+  _Step get _step => _steps![_index];
 
   @override
   void initState() {
     super.initState();
-    // Resume: profile exists but onboarding was not finished.
+    final auth = ref.read(authRepositoryProvider);
+    final gate = auth.ageGateData;
+    if (gate.birthdate != null) {
+      _birthdate = gate.birthdate;
+      _birthdateLocked = true;
+    }
+    _country = gate.countryCode ?? deviceCountryCode();
+
     final existing = ref.read(myProfileProvider).valueOrNull;
     if (existing != null) {
       _profileCreated = true;
       _name.text = existing.displayName;
       _bio.text = existing.bio;
       _prompts = existing.prompts;
-      _step = _Step.photos;
     }
+    _init(auth);
+  }
+
+  Future<void> _init(AuthRepository auth) async {
+    var accepted = false;
+    try {
+      accepted = await auth.hasAcceptedLegal();
+    } catch (_) {}
+    if (_country != null) _minAge = await auth.minAgeFor(_country!);
+    if (!mounted) return;
+    setState(() {
+      _steps = [
+        if (!accepted) _Step.consent,
+        if (!_profileCreated) ...[
+          _Step.name,
+          _Step.place,
+          _Step.birthday,
+          _Step.gender,
+          _Step.interestedIn,
+          _Step.intention,
+          _Step.interests,
+        ],
+        _Step.photos,
+        _Step.about,
+        _Step.location,
+      ];
+    });
   }
 
   @override
   void dispose() {
     _name.dispose();
+    _city.dispose();
     _bio.dispose();
     super.dispose();
   }
 
   bool get _canContinue => switch (_step) {
-        _Step.name => Validators.displayName(_name.text) == null,
-        _Step.birthday => _birthdate != null && isAdult(_birthdate!),
+        _Step.consent => _consentAdult && _consentTerms,
+        _Step.name => Validators.displayName(_name.text) == null && _usernameOk,
+        _Step.place => _country != null && Validators.maxLength(_city.text, 80) == null,
+        _Step.birthday => _birthdate != null && ageFromBirthdate(_birthdate!) >= _minAge,
         _Step.gender => _gender != null,
         _Step.interestedIn => _interestedIn.isNotEmpty,
         _Step.intention => _intention != null,
@@ -80,6 +133,10 @@ class _OnboardingScreenState extends ConsumerState<OnboardingScreen> {
     setState(() => _busy = true);
     try {
       switch (_step) {
+        case _Step.consent:
+          await ref.read(authRepositoryProvider).acceptLegal(LegalDoc.version);
+        case _Step.place:
+          _minAge = await ref.read(authRepositoryProvider).minAgeFor(_country!);
         case _Step.interests when !_profileCreated:
           await ref.read(profileRepositoryProvider).createProfile(ProfileDraft(
                 displayName: _name.text,
@@ -88,6 +145,9 @@ class _OnboardingScreenState extends ConsumerState<OnboardingScreen> {
                 interestedIn: _interestedIn,
                 intention: _intention!,
                 interestIds: _interestIds,
+                countryCode: _country!,
+                username: _username,
+                city: _city.text,
               ));
           _profileCreated = true;
           await ref.read(myProfileProvider.notifier).refresh();
@@ -98,11 +158,11 @@ class _OnboardingScreenState extends ConsumerState<OnboardingScreen> {
         default:
           break;
       }
-      if (_step == _Step.location) {
+      if (_index == _steps!.length - 1) {
         await _finish();
         return;
       }
-      setState(() => _step = _Step.values[_step.index + 1]);
+      setState(() => _index++);
     } catch (e) {
       if (mounted) showSnack(context, e);
     } finally {
@@ -118,12 +178,8 @@ class _OnboardingScreenState extends ConsumerState<OnboardingScreen> {
     } catch (e) {
       if (!mounted) return;
       final error = AppException.from(e);
-      if (error.code == 'location_denied_forever') {
-        showSnack(context, error.message, isError: true);
-        await ref.read(locationServiceProvider).openSettings();
-      } else {
-        showSnack(context, error.message, isError: true);
-      }
+      showSnack(context, error.message, isError: true);
+      if (error.code == 'location_denied_forever') await ref.read(locationServiceProvider).openSettings();
     } finally {
       if (mounted) setState(() => _busy = false);
     }
@@ -135,10 +191,16 @@ class _OnboardingScreenState extends ConsumerState<OnboardingScreen> {
     await ref.read(myProfileProvider.notifier).refresh();
   }
 
+  /// Steps before the profile exists can't be revisited once it's created.
+  bool get _canGoBack {
+    if (_index == 0) return false;
+    final previous = _steps![_index - 1];
+    if (_step == _Step.photos && _profileCreated) return false;
+    return previous != _Step.consent;
+  }
+
   void _back() {
-    final firstStep = _profileCreated ? _Step.photos : _Step.name;
-    if (_step == firstStep) return;
-    setState(() => _step = _Step.values[_step.index - 1]);
+    if (_canGoBack) setState(() => _index--);
   }
 
   Future<void> _pickBirthdate() async {
@@ -149,7 +211,7 @@ class _OnboardingScreenState extends ConsumerState<OnboardingScreen> {
       firstDate: DateTime(now.year - 100),
       lastDate: now,
       helpText: 'Your birthday',
-      initialEntryMode: DatePickerEntryMode.calendarOnly,
+      initialEntryMode: DatePickerEntryMode.input,
     );
     if (picked != null) setState(() => _birthdate = picked);
   }
@@ -157,8 +219,8 @@ class _OnboardingScreenState extends ConsumerState<OnboardingScreen> {
   @override
   Widget build(BuildContext context) {
     final theme = Theme.of(context);
-    final firstStep = _profileCreated ? _Step.photos : _Step.name;
-    final progress = (_step.index + 1) / _Step.values.length;
+    if (_steps == null) return const Scaffold(body: LoadingView());
+    final progress = (_index + 1) / _steps!.length;
 
     return PopScope(
       canPop: false,
@@ -167,9 +229,9 @@ class _OnboardingScreenState extends ConsumerState<OnboardingScreen> {
       },
       child: Scaffold(
         appBar: AppBar(
-          leading: _step == firstStep
-              ? null
-              : IconButton(tooltip: 'Back', icon: const Icon(Icons.arrow_back_rounded), onPressed: _busy ? null : _back),
+          leading: _canGoBack
+              ? IconButton(tooltip: 'Back', icon: const Icon(Icons.arrow_back_rounded), onPressed: _busy ? null : _back)
+              : null,
           automaticallyImplyLeading: false,
           title: ClipRRect(
             borderRadius: BorderRadius.circular(AppRadius.pill),
@@ -218,7 +280,7 @@ class _OnboardingScreenState extends ConsumerState<OnboardingScreen> {
                         ],
                       )
                     : PrimaryButton(
-                        label: 'Continue',
+                        label: _step == _Step.consent ? 'I agree' : 'Continue',
                         loading: _busy,
                         onPressed: _canContinue ? _next : null,
                       ),
@@ -246,9 +308,32 @@ class _OnboardingScreenState extends ConsumerState<OnboardingScreen> {
 
   Widget _buildStep(ThemeData theme) {
     switch (_step) {
+      case _Step.consent:
+        return Column(crossAxisAlignment: CrossAxisAlignment.start, children: [
+          _header(theme, 'Before you start', 'Woops is a community for adults. Please confirm the following.'),
+          CheckboxListTile(
+            value: _consentAdult,
+            contentPadding: EdgeInsets.zero,
+            controlAffinity: ListTileControlAffinity.leading,
+            onChanged: (v) => setState(() => _consentAdult = v ?? false),
+            title: Text('I am at least $_minAge years old'),
+            subtitle: const Text('Or older, if the law in my country requires it.'),
+          ),
+          CheckboxListTile(
+            value: _consentTerms,
+            contentPadding: EdgeInsets.zero,
+            controlAffinity: ListTileControlAffinity.leading,
+            onChanged: (v) => setState(() => _consentTerms = v ?? false),
+            title: const Text('I agree to the Terms, Privacy Policy and Community Guidelines'),
+          ),
+          Wrap(spacing: 8, children: [
+            for (final doc in LegalDoc.values)
+              TextButton(onPressed: () => openLegal(context, doc), child: Text(doc.title)),
+          ]),
+        ]);
       case _Step.name:
         return Column(crossAxisAlignment: CrossAxisAlignment.start, children: [
-          _header(theme, 'What’s your first name?', 'This is how you’ll appear on Amora.'),
+          _header(theme, 'What’s your first name?', 'This is how you’ll appear on Woops.'),
           TextField(
             key: const Key('onboarding-name'),
             controller: _name,
@@ -257,7 +342,34 @@ class _OnboardingScreenState extends ConsumerState<OnboardingScreen> {
             textCapitalization: TextCapitalization.words,
             decoration: const InputDecoration(hintText: 'First name'),
             onChanged: (_) => setState(() {}),
-            onSubmitted: (_) => _canContinue ? _next() : null,
+          ),
+          const SizedBox(height: AppSpacing.sm),
+          Text('Pick a username', style: theme.textTheme.titleMedium),
+          const SizedBox(height: AppSpacing.sm),
+          UsernameField(onChanged: (v, ok) => setState(() {
+                _username = v;
+                _usernameOk = ok;
+              })),
+        ]);
+      case _Step.place:
+        final country = countryByCode(_country);
+        return Column(crossAxisAlignment: CrossAxisAlignment.start, children: [
+          _header(theme, 'Where are you based?', 'Shown on your profile. People anywhere in the world can use Woops.'),
+          OutlinedButton.icon(
+            onPressed: () async {
+              final c = await showCountryPicker(context, selected: _country);
+              if (c != null) setState(() => _country = c.code);
+            },
+            icon: Text(country?.flag ?? '🌍', style: const TextStyle(fontSize: 20)),
+            label: Text(country?.name ?? 'Choose your country'),
+          ),
+          const SizedBox(height: AppSpacing.md),
+          TextField(
+            controller: _city,
+            maxLength: 80,
+            textCapitalization: TextCapitalization.words,
+            decoration: const InputDecoration(hintText: 'City (optional)'),
+            onChanged: (_) => setState(() {}),
           ),
         ]);
       case _Step.birthday:
@@ -265,15 +377,20 @@ class _OnboardingScreenState extends ConsumerState<OnboardingScreen> {
         return Column(crossAxisAlignment: CrossAxisAlignment.start, children: [
           _header(theme, 'When’s your birthday?', 'Only your age is shown. You can’t change this later.'),
           OutlinedButton.icon(
-            onPressed: _pickBirthdate,
+            onPressed: _birthdateLocked ? null : _pickBirthdate,
             icon: const Icon(Icons.cake_outlined),
             label: Text(_birthdate == null ? 'Select date' : DateFormat.yMMMMd().format(_birthdate!)),
           ),
+          if (_birthdateLocked)
+            Padding(
+              padding: const EdgeInsets.only(top: 8),
+              child: Text('From your sign-up.', style: theme.textTheme.bodySmall),
+            ),
           if (age != null) ...[
             const SizedBox(height: AppSpacing.md),
             Text(
-              age >= 18 ? 'You’re $age.' : 'You must be at least 18 to use Amora.',
-              style: theme.textTheme.titleMedium?.copyWith(color: age >= 18 ? null : theme.colorScheme.error),
+              age >= _minAge ? 'You’re $age.' : 'Sorry, you must be at least $_minAge to use Woops in your country.',
+              style: theme.textTheme.titleMedium?.copyWith(color: age >= _minAge ? null : theme.colorScheme.error),
             ),
           ],
         ]);
@@ -324,7 +441,7 @@ class _OnboardingScreenState extends ConsumerState<OnboardingScreen> {
       case _Step.photos:
         return Column(crossAxisAlignment: CrossAxisAlignment.start, children: [
           _header(theme, 'Add your photos', 'Add at least one. Clear photos of your face work best. '
-              'Tap a photo to make it your main one or remove it.'),
+              'Photos are compressed and their hidden location data is removed before upload.'),
           const PhotoGridEditor(),
         ]);
       case _Step.about:
@@ -345,9 +462,9 @@ class _OnboardingScreenState extends ConsumerState<OnboardingScreen> {
       case _Step.location:
         return Column(crossAxisAlignment: CrossAxisAlignment.start, children: [
           _header(theme, 'See people near you'),
-          _Explainer(icon: Icons.near_me_outlined, text: 'We use your location to show people nearby and how far away they are.'),
-          _Explainer(icon: Icons.lock_outline_rounded, text: 'Your exact location is never stored or shown. We round it to about 1 km.'),
-          _Explainer(icon: Icons.tune_rounded, text: 'You can hide your distance in Privacy settings at any time.'),
+          const _Explainer(icon: Icons.near_me_outlined, text: 'We use your location to show people nearby and how far away they are.'),
+          const _Explainer(icon: Icons.lock_outline_rounded, text: 'Your exact location is never stored or shown. We round it to about 1 km.'),
+          const _Explainer(icon: Icons.public_rounded, text: 'Prefer meeting people anywhere? Choose "Anywhere" in filters.'),
         ]);
     }
   }

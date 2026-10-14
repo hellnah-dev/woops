@@ -1,7 +1,7 @@
-import 'package:amora/core/supabase/supabase_providers.dart';
-import 'package:amora/core/utils/app_exception.dart';
-import 'package:amora/features/discovery/application/discovery_controller.dart';
-import 'package:amora/features/discovery/data/discovery_repository.dart';
+import 'package:woops/core/supabase/supabase_providers.dart';
+import 'package:woops/core/utils/app_exception.dart';
+import 'package:woops/features/discovery/application/discovery_controller.dart';
+import 'package:woops/features/discovery/data/discovery_repository.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
 import 'package:flutter_test/flutter_test.dart';
 import 'package:supabase_flutter/supabase_flutter.dart';

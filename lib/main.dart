@@ -1,10 +1,13 @@
 import 'package:flutter/material.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
+import 'package:intl/date_symbol_data_local.dart';
+import 'package:intl/intl.dart';
 import 'package:supabase_flutter/supabase_flutter.dart';
 
 import 'app.dart';
 import 'core/config/env.dart';
 import 'core/theme/app_theme.dart';
+import 'core/utils/error_reporter.dart';
 import 'features/notifications/push_service.dart';
 
 Future<void> main() async {
@@ -15,10 +18,16 @@ Future<void> main() async {
     return;
   }
 
+  // Dates and numbers use the phone's language/region (e.g. 14/10/2026 vs 10/14/2026).
+  await initializeDateFormatting();
+  final locale = WidgetsBinding.instance.platformDispatcher.locale.toLanguageTag().replaceAll('-', '_');
+  Intl.defaultLocale = Intl.verifiedLocale(locale, DateFormat.localeExists, onFailure: (_) => 'en');
+
   await Supabase.initialize(url: Env.supabaseUrl, publishableKey: Env.supabasePublishableKey);
+  ErrorReporter.install();
   await PushService.initializeFirebase();
 
-  runApp(const ProviderScope(child: AmoraApp()));
+  runApp(const ProviderScope(child: WoopsApp()));
 }
 
 /// Shown when the app is started without `--dart-define-from-file=.env`.
