@@ -1,0 +1,22 @@
+{
+  // Press F5 (or Run → Start Debugging) to run Woops on the selected device.
+  // Pick the device first in the bottom-right corner of VS Code.
+  "version": "0.2.0",
+  "configurations": [
+    {
+      "name": "Woops (debug)",
+      "request": "launch",
+      "type": "dart",
+      "program": "lib/main.dart",
+      "args": ["--dart-define-from-file=.env"]
+    },
+    {
+      "name": "Woops (release, test performance)",
+      "request": "launch",
+      "type": "dart",
+      "program": "lib/main.dart",
+      "flutterMode": "release",
+      "args": ["--dart-define-from-file=.env"]
+    }
+  ]
+}
