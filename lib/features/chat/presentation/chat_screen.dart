@@ -7,6 +7,7 @@ import '../../../core/router/app_router.dart';
 import '../../../core/theme/app_colors.dart';
 import '../../../core/utils/time_format.dart';
 import '../../../core/widgets/profile_photo.dart';
+import '../../../core/widgets/confirm_dialog.dart';
 import '../../../core/widgets/state_views.dart';
 import '../../safety/presentation/safety_actions.dart';
 import '../application/chat_controllers.dart';
@@ -111,22 +112,15 @@ class _ChatViewState extends ConsumerState<_ChatView> {
       case 'profile':
         _openProfile();
       case 'unmatch':
-        final ok = await showDialog<bool>(
-          context: context,
-          builder: (context) => AlertDialog(
-            title: Text('Unmatch $name?'),
-            content: const Text('This removes the match and your conversation for both of you. It can’t be undone.'),
-            actions: [
-              TextButton(onPressed: () => Navigator.pop(context, false), child: const Text('Cancel')),
-              TextButton(
-                style: TextButton.styleFrom(foregroundColor: Theme.of(context).colorScheme.error),
-                onPressed: () => Navigator.pop(context, true),
-                child: const Text('Unmatch'),
-              ),
-            ],
-          ),
+        final ok = await confirmAction(
+          context,
+          icon: Icons.heart_broken_outlined,
+          destructive: true,
+          title: 'Unmatch $name?',
+          message: 'This removes the match and your conversation for both of you. It can’t be undone.',
+          confirmLabel: 'Unmatch',
         );
-        if (ok != true) return;
+        if (!ok) return;
         try {
           await ref.read(chatRepositoryProvider).unmatch(widget.args.matchId);
           await ref.read(inboxProvider.notifier).refresh();
@@ -272,7 +266,16 @@ class _ChatViewState extends ConsumerState<_ChatView> {
                             showStatus: mine && (m.id == lastMine?.id || m.delivery != DeliveryState.sent),
                             isRead: isRead,
                             onRetry: () => controller.retry(m),
-                            onDiscard: () => controller.discardFailed(m),
+                            onDiscard: () async {
+                            final ok = await confirmAction(
+                              context,
+                              title: 'Delete this message?',
+                              message: 'It wasn’t sent, so only you can see it.',
+                              confirmLabel: 'Delete',
+                              destructive: true,
+                            );
+                            if (ok) controller.discardFailed(m);
+                          },
                             onLongPress: m.delivery == DeliveryState.sent ? () => _messageActions(m, mine) : null,
                           ),
                         ],

@@ -104,6 +104,11 @@ async function renderUser(view, id, rerender) {
     catch (e) { toast(e.message, { type: 'error' }); }
   }));
   view.querySelector('#verify').onclick = async () => {
+    const ok = await ask(p.is_verified
+      ? { title: `Remove ${p.display_name}'s verified badge?`, danger: true, confirmLabel: 'Remove badge' }
+      : { title: `Mark ${p.display_name} as verified?`, confirmLabel: 'Mark verified',
+          message: 'Only do this after checking a selfie or other proof that the photos are really them.' });
+    if (!ok) return;
     try { await rpc('admin_set_verified', { p_user: id, p_verified: !p.is_verified }); toast('Updated', { type: 'ok' }); rerender(); }
     catch (e) { toast(e.message, { type: 'error' }); }
   };

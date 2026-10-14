@@ -2,6 +2,7 @@ import 'package:flutter/material.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
 
 import '../../../core/widgets/app_logo.dart';
+import '../../../core/widgets/confirm_dialog.dart';
 import '../../../core/widgets/love_widgets.dart';
 import '../../../core/widgets/state_views.dart';
 import '../../profile/application/profile_providers.dart';
@@ -25,7 +26,11 @@ class SplashScreen extends ConsumerWidget {
                       child: ErrorView(error: profile.error!, onRetry: () => ref.invalidate(myProfileProvider)),
                     ),
                     TextButton(
-                      onPressed: () => ref.read(authRepositoryProvider).signOut(),
+                      onPressed: () async {
+                        if (await confirmAction(context, title: 'Sign out?', confirmLabel: 'Sign out')) {
+                          await ref.read(authRepositoryProvider).signOut();
+                        }
+                      },
                       child: const Text('Sign out'),
                     ),
                     const SizedBox(height: 16),

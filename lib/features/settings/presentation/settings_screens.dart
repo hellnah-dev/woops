@@ -9,6 +9,7 @@ import '../../../core/router/app_router.dart';
 import '../../../core/supabase/supabase_providers.dart';
 import '../../../core/theme/app_colors.dart';
 import '../../../core/widgets/state_views.dart';
+import '../../../core/widgets/confirm_dialog.dart';
 import '../../ads/ads_service.dart';
 import '../../auth/data/auth_repository.dart';
 import '../../discovery/application/discovery_controller.dart';
@@ -44,6 +45,14 @@ class SettingsScreen extends ConsumerWidget {
   const SettingsScreen({super.key});
 
   Future<void> _logout(BuildContext context, WidgetRef ref) async {
+    final ok = await confirmAction(
+      context,
+      icon: Icons.logout_rounded,
+      title: 'Log out?',
+      message: 'You’ll stop getting notifications on this device until you sign in again.',
+      confirmLabel: 'Log out',
+    );
+    if (!ok) return;
     await ref.read(pushServiceProvider).unregister();
     await ref.read(authRepositoryProvider).signOut();
   }
@@ -318,7 +327,20 @@ class PrivacySettingsScreen extends ConsumerWidget {
               title: const Text('Show me in Discover'),
               subtitle: const Text('Turn off to pause your profile. Existing matches can still chat with you.'),
               value: s.discoverable,
-              onChanged: (v) => _save(context, ref, s.copyWith(discoverable: v)),
+              onChanged: (v) async {
+                if (!v &&
+                    !await confirmAction(
+                      context,
+                      icon: Icons.pause_circle_outline_rounded,
+                      title: 'Pause your profile?',
+                      message: 'New people won’t see you in Discover until you turn this back on. '
+                          'Your matches and chats stay as they are.',
+                      confirmLabel: 'Pause',
+                    )) {
+                  return;
+                }
+                if (context.mounted) await _save(context, ref, s.copyWith(discoverable: v));
+              },
             ),
             SwitchListTile(
               title: const Text('Show my distance'),
@@ -371,6 +393,14 @@ class BlockedUsersScreen extends ConsumerWidget {
                       title: Text(u.displayName),
                       trailing: TextButton(
                         onPressed: () async {
+                          final ok = await confirmAction(
+                            context,
+                            title: 'Unblock ${u.displayName}?',
+                            message: 'You may see each other in Discover again. Any previous match '
+                                'and conversation won’t come back.',
+                            confirmLabel: 'Unblock',
+                          );
+                          if (!ok) return;
                           try {
                             await ref.read(safetyRepositoryProvider).unblock(u.id);
                             ref.invalidate(blockedUsersProvider);

@@ -1,5 +1,5 @@
 import { rpc } from '../api.js';
-import { esc, fmtDate, toast } from '../ui.js';
+import { ask, esc, fmtDate, toast } from '../ui.js';
 
 export async function render(view, _params, rerender) {
   const showResolved = sessionStorage.getItem('errors-resolved') === '1';
@@ -20,6 +20,9 @@ export async function render(view, _params, rerender) {
       </div>`).join('') || '<div class="card empty">No errors 🎉</div>'}`;
   view.querySelector('#resolved').onchange = (ev) => { sessionStorage.setItem('errors-resolved', ev.target.checked ? '1' : '0'); rerender(); };
   view.querySelectorAll('[data-fp]').forEach((b) => b.addEventListener('click', async () => {
+    const ok = await ask({ title: 'Mark this error as resolved?', confirmLabel: 'Mark resolved',
+      message: 'It will be hidden from the list. If it happens again, it will come back.' });
+    if (!ok) return;
     try { await rpc('admin_resolve_error', { p_fingerprint: b.dataset.fp }); toast('Marked resolved', { type: 'ok' }); rerender(); }
     catch (e) { toast(e.message, { type: 'error' }); }
   }));

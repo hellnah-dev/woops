@@ -8,6 +8,7 @@ import '../../../core/theme/app_colors.dart';
 import '../../../core/utils/app_exception.dart';
 import '../../../core/utils/validators.dart';
 import '../../../core/widgets/buttons.dart';
+import '../../../core/widgets/confirm_dialog.dart';
 import '../../../core/widgets/country_picker.dart';
 import '../../../core/widgets/state_views.dart';
 import '../../auth/data/auth_repository.dart';
@@ -245,7 +246,19 @@ class _OnboardingScreenState extends ConsumerState<OnboardingScreen> {
             child: LinearProgressIndicator(value: progress, minHeight: 6),
           ),
           actions: [
-            TextButton(onPressed: () => ref.read(authRepositoryProvider).signOut(), child: const Text('Sign out')),
+            TextButton(
+              onPressed: () async {
+                final ok = await confirmAction(
+                  context,
+                  title: 'Sign out?',
+                  message: 'Anything you haven’t finished on this step won’t be saved. '
+                      'You can continue setting up your profile next time you sign in.',
+                  confirmLabel: 'Sign out',
+                );
+                if (ok) await ref.read(authRepositoryProvider).signOut();
+              },
+              child: const Text('Sign out'),
+            ),
           ],
         ),
         body: SafeArea(

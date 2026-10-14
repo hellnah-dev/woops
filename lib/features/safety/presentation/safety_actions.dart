@@ -3,6 +3,7 @@ import 'package:flutter_riverpod/flutter_riverpod.dart';
 
 import '../../../core/theme/app_colors.dart';
 import '../../../core/widgets/state_views.dart';
+import '../../../core/widgets/confirm_dialog.dart';
 import '../../chat/application/chat_controllers.dart';
 import '../../discovery/application/discovery_controller.dart';
 import '../data/safety_repository.dart';
@@ -20,25 +21,16 @@ Future<bool> confirmAndBlock(
   required String userId,
   required String name,
 }) async {
-  final ok = await showDialog<bool>(
-    context: context,
-    builder: (context) => AlertDialog(
-      title: Text('Block $name?'),
-      content: Text(
-        '$name won’t be able to see your profile or message you, and you’ll be unmatched. '
+  final ok = await confirmAction(
+    context,
+    icon: Icons.block_rounded,
+    destructive: true,
+    title: 'Block $name?',
+    message: '$name won’t be able to see your profile or message you, and you’ll be unmatched. '
         'They won’t be told that you blocked them.',
-      ),
-      actions: [
-        TextButton(onPressed: () => Navigator.pop(context, false), child: const Text('Cancel')),
-        TextButton(
-          onPressed: () => Navigator.pop(context, true),
-          style: TextButton.styleFrom(foregroundColor: Theme.of(context).colorScheme.error),
-          child: const Text('Block'),
-        ),
-      ],
-    ),
+    confirmLabel: 'Block',
   );
-  if (ok != true) return false;
+  if (!ok || !context.mounted) return false;
   try {
     await ref.read(safetyRepositoryProvider).block(userId);
     _afterSafetyAction(ref);

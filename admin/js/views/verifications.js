@@ -27,6 +27,9 @@ export async function render(view, _params, rerender) {
       </div>`).join('') : '<div class="card empty">No pending verifications.</div>'}`;
 
   view.querySelectorAll('[data-approve]').forEach((b) => b.addEventListener('click', async () => {
+    const ok = await ask({ title: 'Approve verification?', confirmLabel: 'Approve',
+      message: 'Only approve if the selfie clearly matches the profile photos. The user gets a blue verified badge.' });
+    if (!ok) return;
     try { await rpc('admin_review_verification', { p_request: b.dataset.approve, p_approve: true }); toast('Approved', { type: 'ok' }); rerender(); }
     catch (e) { toast(e.message, { type: 'error' }); }
   }));

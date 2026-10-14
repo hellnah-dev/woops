@@ -1,6 +1,6 @@
 import { initClient, rpc } from './api.js';
 import { enableDesktopAlerts, startRealtime } from './notify.js';
-import { $, $$, esc, loading, showError } from './ui.js';
+import { $, $$, ask, esc, loading, showError } from './ui.js';
 import * as ageRules from './views/ageRules.js';
 import * as audit from './views/audit.js';
 import * as dashboard from './views/dashboard.js';
@@ -82,7 +82,11 @@ $('#login-form').addEventListener('submit', async (e) => {
   if (error) { $('#login-error').textContent = error.message; return; }
   showApp(data.session);
 });
-$('#logout').onclick = async () => { await supabase.auth.signOut(); location.reload(); };
+$('#logout').onclick = async () => {
+  if (!(await ask({ title: 'Sign out of the admin panel?', confirmLabel: 'Sign out' }))) return;
+  await supabase.auth.signOut();
+  location.reload();
+};
 $('#enable-notifications').onclick = enableDesktopAlerts;
 
 const { data: { session } } = await supabase.auth.getSession();

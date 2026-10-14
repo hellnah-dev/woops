@@ -8,6 +8,7 @@ import 'package:image_picker/image_picker.dart';
 import '../../../core/permissions/permission_gate.dart';
 import '../../../core/theme/app_colors.dart';
 import '../../../core/widgets/photo_viewer.dart';
+import '../../../core/widgets/confirm_dialog.dart';
 import '../../../core/widgets/profile_photo.dart';
 import '../../../core/widgets/state_views.dart';
 import '../application/profile_providers.dart';
@@ -155,21 +156,15 @@ class _PhotoGridEditorState extends ConsumerState<PhotoGridEditor> {
       showSnack(context, 'Your profile needs at least one photo. Add another before removing this one.', isError: true);
       return;
     }
-    final ok = await showDialog<bool>(
-      context: context,
-      builder: (context) => AlertDialog(
-        title: const Text('Remove this photo?'),
-        actions: [
-          TextButton(onPressed: () => Navigator.pop(context, false), child: const Text('Cancel')),
-          TextButton(
-            style: TextButton.styleFrom(foregroundColor: Theme.of(context).colorScheme.error),
-            onPressed: () => Navigator.pop(context, true),
-            child: const Text('Remove'),
-          ),
-        ],
-      ),
+    final ok = await confirmAction(
+      context,
+      icon: Icons.delete_outline_rounded,
+      destructive: true,
+      title: 'Remove this photo?',
+      message: 'It will be deleted from your profile.',
+      confirmLabel: 'Remove',
     );
-    if (ok != true || !mounted) return;
+    if (!ok || !mounted) return;
     setState(() => _busyId = photo.id);
     try {
       await _repo.deletePhoto(photo);

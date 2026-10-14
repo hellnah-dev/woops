@@ -5,6 +5,7 @@ import '../../../core/i18n/countries.dart';
 import '../../../core/theme/app_colors.dart';
 import '../../../core/utils/validators.dart';
 import '../../../core/widgets/choice_chips.dart';
+import '../../../core/widgets/confirm_dialog.dart';
 import '../../../core/widgets/country_picker.dart';
 import '../../../core/widgets/state_views.dart';
 import '../application/profile_providers.dart';
@@ -35,12 +36,14 @@ class _EditProfileScreenState extends ConsumerState<EditProfileScreen> {
   late String _username;
   bool _usernameOk = true;
   late List<ProfilePrompt> _prompts;
+  late final MyProfile _initial;
   bool _saving = false;
 
   @override
   void initState() {
     super.initState();
     final p = ref.read(myProfileProvider).requireValue!;
+    _initial = p;
     _name = TextEditingController(text: p.displayName);
     _bio = TextEditingController(text: p.bio);
     _job = TextEditingController(text: p.jobTitle);
@@ -61,6 +64,42 @@ class _EditProfileScreenState extends ConsumerState<EditProfileScreen> {
     _job.dispose();
     _city.dispose();
     super.dispose();
+  }
+
+  /// True if anything differs from the saved profile (photos save instantly).
+  bool get _isDirty {
+    final p = _initial;
+    String norm(String? s) => (s ?? '').trim();
+    String prompts(List<ProfilePrompt> l) => l.map((x) => '${x.prompt}|${x.answer.trim()}').join('\n');
+    return norm(_name.text) != norm(p.displayName) ||
+        norm(_bio.text) != norm(p.bio) ||
+        norm(_job.text) != norm(p.jobTitle) ||
+        norm(_city.text) != norm(p.city) ||
+        _gender != p.gender ||
+        _intention != p.intention ||
+        _country != p.countryCode ||
+        _username.trim().toLowerCase() != (p.username ?? '') ||
+        _interests.length != p.interestIds.length ||
+        !_interests.containsAll(p.interestIds) ||
+        prompts(_prompts) != prompts(p.prompts);
+  }
+
+  Future<void> _confirmLeave() async {
+    final navigator = Navigator.of(context);
+    if (!_isDirty) {
+      navigator.pop();
+      return;
+    }
+    final discard = await confirmAction(
+      context,
+      icon: Icons.edit_off_rounded,
+      title: 'Discard changes?',
+      message: 'You have unsaved changes to your profile.',
+      confirmLabel: 'Discard',
+      cancelLabel: 'Keep editing',
+      destructive: true,
+    );
+    if (discard) navigator.pop();
   }
 
   Future<void> _save() async {
@@ -102,97 +141,103 @@ class _EditProfileScreenState extends ConsumerState<EditProfileScreen> {
 
   @override
   Widget build(BuildContext context) {
-    return Scaffold(
-      appBar: AppBar(
-        title: const Text('Edit profile'),
-        actions: [
-          TextButton(
-            onPressed: _saving ? null : _save,
-            child: _saving
-                ? const SizedBox(width: 20, height: 20, child: CircularProgressIndicator(strokeWidth: 2))
-                : const Text('Save'),
-          ),
-          const SizedBox(width: 8),
-        ],
-      ),
-      body: SafeArea(
-        child: Form(
-          key: _form,
-          child: ListView(
-            padding: const EdgeInsets.fromLTRB(AppSpacing.lg, 0, AppSpacing.lg, AppSpacing.xxl),
-            children: [
-              const SectionLabel('Photos', trailing: 'Tap a photo for options'),
-              const PhotoGridEditor(),
-              const SectionLabel('Name'),
-              TextFormField(
-                controller: _name,
-                maxLength: 40,
-                textCapitalization: TextCapitalization.words,
-                validator: Validators.displayName,
-              ),
-              const SectionLabel('Username'),
-              UsernameField(
-                initial: _username,
-                current: ref.read(myProfileProvider).valueOrNull?.username,
-                onChanged: (v, ok) => setState(() {
-                  _username = v;
-                  _usernameOk = ok;
-                }),
-              ),
-              const SectionLabel('About me'),
-              TextFormField(
-                controller: _bio,
-                maxLength: 500,
-                minLines: 3,
-                maxLines: 6,
-                textCapitalization: TextCapitalization.sentences,
-                decoration: const InputDecoration(hintText: 'A few lines about you…'),
-              ),
-              const SectionLabel('Prompts', trailing: 'Up to 3'),
-              PromptsEditor(prompts: _prompts, onChanged: (p) => setState(() => _prompts = p)),
-              const SectionLabel('Work'),
-              TextFormField(
-                controller: _job,
-                maxLength: 60,
-                textCapitalization: TextCapitalization.words,
-                decoration: const InputDecoration(hintText: 'Job title'),
-              ),
-              const SectionLabel('Country'),
-              OutlinedButton.icon(
-                onPressed: () async {
-                  final c = await showCountryPicker(context, selected: _country);
-                  if (c != null) setState(() => _country = c.code);
-                },
-                icon: Text(countryByCode(_country)?.flag ?? '🌍', style: const TextStyle(fontSize: 20)),
-                label: Text(countryByCode(_country)?.name ?? 'Choose your country'),
-              ),
-              const SectionLabel('City'),
-              TextFormField(
-                controller: _city,
-                maxLength: 80,
-                textCapitalization: TextCapitalization.words,
-                decoration: const InputDecoration(hintText: 'Where you live'),
-              ),
-              const SectionLabel('Gender'),
-              ChoiceChipGroup<Gender>(
-                options: Gender.values,
-                selected: {_gender},
-                multiSelect: false,
-                labelOf: (g) => g.label,
-                onChanged: (s) => setState(() => _gender = s.first),
-              ),
-              const SectionLabel('Looking for'),
-              ChoiceChipGroup<Intention>(
-                options: Intention.values,
-                selected: {_intention},
-                multiSelect: false,
-                labelOf: (i) => i.label,
-                leadingOf: (i) => i.emoji,
-                onChanged: (s) => setState(() => _intention = s.first),
-              ),
-              SectionLabel('Interests', trailing: '${_interests.length}/10'),
-              InterestPicker(selected: _interests, onChanged: (s) => setState(() => _interests = s)),
-            ],
+    return PopScope(
+      canPop: false,
+      onPopInvokedWithResult: (didPop, _) {
+        if (!didPop && !_saving) _confirmLeave();
+      },
+      child: Scaffold(
+        appBar: AppBar(
+          title: const Text('Edit profile'),
+          actions: [
+            TextButton(
+              onPressed: _saving ? null : _save,
+              child: _saving
+                  ? const SizedBox(width: 20, height: 20, child: CircularProgressIndicator(strokeWidth: 2))
+                  : const Text('Save'),
+            ),
+            const SizedBox(width: 8),
+          ],
+        ),
+        body: SafeArea(
+          child: Form(
+            key: _form,
+            child: ListView(
+              padding: const EdgeInsets.fromLTRB(AppSpacing.lg, 0, AppSpacing.lg, AppSpacing.xxl),
+              children: [
+                const SectionLabel('Photos', trailing: 'Tap a photo for options'),
+                const PhotoGridEditor(),
+                const SectionLabel('Name'),
+                TextFormField(
+                  controller: _name,
+                  maxLength: 40,
+                  textCapitalization: TextCapitalization.words,
+                  validator: Validators.displayName,
+                ),
+                const SectionLabel('Username'),
+                UsernameField(
+                  initial: _username,
+                  current: ref.read(myProfileProvider).valueOrNull?.username,
+                  onChanged: (v, ok) => setState(() {
+                    _username = v;
+                    _usernameOk = ok;
+                  }),
+                ),
+                const SectionLabel('About me'),
+                TextFormField(
+                  controller: _bio,
+                  maxLength: 500,
+                  minLines: 3,
+                  maxLines: 6,
+                  textCapitalization: TextCapitalization.sentences,
+                  decoration: const InputDecoration(hintText: 'A few lines about you…'),
+                ),
+                const SectionLabel('Prompts', trailing: 'Up to 3'),
+                PromptsEditor(prompts: _prompts, onChanged: (p) => setState(() => _prompts = p)),
+                const SectionLabel('Work'),
+                TextFormField(
+                  controller: _job,
+                  maxLength: 60,
+                  textCapitalization: TextCapitalization.words,
+                  decoration: const InputDecoration(hintText: 'Job title'),
+                ),
+                const SectionLabel('Country'),
+                OutlinedButton.icon(
+                  onPressed: () async {
+                    final c = await showCountryPicker(context, selected: _country);
+                    if (c != null) setState(() => _country = c.code);
+                  },
+                  icon: Text(countryByCode(_country)?.flag ?? '🌍', style: const TextStyle(fontSize: 20)),
+                  label: Text(countryByCode(_country)?.name ?? 'Choose your country'),
+                ),
+                const SectionLabel('City'),
+                TextFormField(
+                  controller: _city,
+                  maxLength: 80,
+                  textCapitalization: TextCapitalization.words,
+                  decoration: const InputDecoration(hintText: 'Where you live'),
+                ),
+                const SectionLabel('Gender'),
+                ChoiceChipGroup<Gender>(
+                  options: Gender.values,
+                  selected: {_gender},
+                  multiSelect: false,
+                  labelOf: (g) => g.label,
+                  onChanged: (s) => setState(() => _gender = s.first),
+                ),
+                const SectionLabel('Looking for'),
+                ChoiceChipGroup<Intention>(
+                  options: Intention.values,
+                  selected: {_intention},
+                  multiSelect: false,
+                  labelOf: (i) => i.label,
+                  leadingOf: (i) => i.emoji,
+                  onChanged: (s) => setState(() => _intention = s.first),
+                ),
+                SectionLabel('Interests', trailing: '${_interests.length}/10'),
+                InterestPicker(selected: _interests, onChanged: (s) => setState(() => _interests = s)),
+              ],
+            ),
           ),
         ),
       ),
