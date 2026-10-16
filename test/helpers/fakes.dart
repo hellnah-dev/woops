@@ -1,4 +1,5 @@
 import 'dart:async';
+import 'dart:typed_data';
 
 import 'package:woops/features/chat/data/chat_repository.dart';
 import 'package:woops/features/chat/domain/chat_models.dart';
@@ -7,8 +8,9 @@ import 'package:woops/features/profile/domain/profile_enums.dart';
 import 'package:woops/features/profile/domain/profile_models.dart';
 import 'package:supabase_flutter/supabase_flutter.dart';
 
-ProfileCard card(String id, {String? name, int age = 27}) => ProfileCard(
+ProfileCard card(String id, {String? name, int age = 27, bool random = false}) => ProfileCard(
   id: id,
+  isRandom: random,
   displayName: name ?? 'User $id',
   age: age,
   gender: Gender.woman,
@@ -66,7 +68,6 @@ class FakeChatRepository implements ChatRepository {
   final incoming = StreamController<ChatMessage>.broadcast();
   final receipts = StreamController<DateTime>.broadcast();
   final inbox = StreamController<void>.broadcast();
-  List<ChatMessage> history = [];
   final sentClientIds = <String>[];
   int failNextSends = 0;
   int markReadCalls = 0;
@@ -77,29 +78,73 @@ class FakeChatRepository implements ChatRepository {
   @override
   Future<List<ConversationSummary>> fetchConversations({int limit = 50, int offset = 0}) async => const [];
 
-  @override
-  Future<List<ChatMessage>> fetchMessages(String conversationId, {DateTime? before, int limit = 30}) async {
-    final sorted = [...history]..sort((a, b) => b.createdAt.compareTo(a.createdAt));
-    return sorted.where((m) => before == null || m.createdAt.isBefore(before)).take(limit).toList();
-  }
+  /// Messages waiting on the fake relay.
+  List<ChatMessage> pending = [];
+  final ackedIds = <String>[];
 
   @override
-  Future<ChatMessage> sendMessage(String conversationId, String body, {required String clientId}) async {
+  Future<List<ChatMessage>> fetchPendingMessages() async => [...pending];
+
+  @override
+  Future<void> ackMessages(List<String> ids) async {
+    ackedIds.addAll(ids);
+    pending.removeWhere((m) => ids.contains(m.id));
+  }
+
+  /// What actually went over the wire (ciphertext when encrypted).
+  final sentBodies = <String>[];
+  final sentEncrypted = <bool>[];
+  final chatKeys = <String, String>{};
+  final media = <String, Uint8List>{};
+  int mediaUsed = 0;
+  int mediaLimit = 5 * 1024 * 1024;
+
+  @override
+  Future<ChatMessage> sendMessage(
+    String conversationId,
+    String body, {
+    required String clientId,
+    MessageKind kind = MessageKind.text,
+    String? mediaPath,
+    bool encrypted = false,
+  }) async {
     if (failNextSends > 0) {
       failNextSends--;
       throw const PostgrestException(message: 'rate_limited: slow down');
     }
     sentClientIds.add(clientId);
+    sentBodies.add(body);
+    sentEncrypted.add(encrypted);
     return ChatMessage(
       id: 'srv-$clientId',
       conversationId: conversationId,
       senderId: myId,
       clientId: clientId,
-      kind: MessageKind.text,
+      kind: kind,
       body: body,
+      mediaPath: mediaPath,
+      encrypted: encrypted,
       createdAt: DateTime.now().toUtc(),
     );
   }
+
+  @override
+  Future<void> publishChatKey(String publicKey) async => chatKeys[myId] = publicKey;
+
+  @override
+  Future<String?> fetchChatKey(String userId) async => chatKeys[userId];
+
+  @override
+  Future<void> uploadMedia(String path, Uint8List bytes) async => media[path] = bytes;
+
+  @override
+  Future<Uint8List> downloadMedia(String path) async => media[path] ?? (throw Exception('not found'));
+
+  @override
+  Future<void> deleteMedia(String path) async => media.remove(path);
+
+  @override
+  Future<({int used, int limit})> mediaUsage() async => (used: mediaUsed, limit: mediaLimit);
 
   @override
   Future<void> markRead(String conversationId) async => markReadCalls++;

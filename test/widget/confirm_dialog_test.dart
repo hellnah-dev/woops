@@ -5,20 +5,22 @@ import 'package:woops/core/widgets/confirm_dialog.dart';
 void main() {
   Future<bool?> open(WidgetTester tester, Future<void> Function() act) async {
     bool? result;
-    await tester.pumpWidget(MaterialApp(
-      home: Builder(
-        builder: (context) => TextButton(
-          onPressed: () async => result = await confirmAction(
-            context,
-            title: 'Block Asha?',
-            message: 'She won’t be able to message you.',
-            confirmLabel: 'Block',
-            destructive: true,
+    await tester.pumpWidget(
+      MaterialApp(
+        home: Builder(
+          builder: (context) => TextButton(
+            onPressed: () async => result = await confirmAction(
+              context,
+              title: 'Block Asha?',
+              message: 'She won’t be able to message you.',
+              confirmLabel: 'Block',
+              destructive: true,
+            ),
+            child: const Text('open'),
           ),
-          child: const Text('open'),
         ),
       ),
-    ));
+    );
     await tester.tap(find.text('open'));
     await tester.pumpAndSettle();
     expect(find.text('Block Asha?'), findsOneWidget);

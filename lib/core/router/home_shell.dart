@@ -4,8 +4,14 @@ import 'package:go_router/go_router.dart';
 
 import '../../features/ads/ads_service.dart';
 import '../../features/chat/application/chat_controllers.dart';
+import '../../features/chat/data/chat_repository.dart';
+import '../../features/notifications/notification_center.dart';
+import '../../features/profile/application/profile_providers.dart';
 import '../../features/notifications/push_service.dart';
+import '../../features/permissions/permissions_screen.dart';
+import '../../features/profile/data/location_service.dart';
 import '../../features/profile/data/profile_repository.dart';
+import 'app_router.dart';
 
 /// Bottom navigation: Discover · Likes · Matches · Chats · Profile.
 class HomeShell extends ConsumerStatefulWidget {
@@ -23,8 +29,18 @@ class _HomeShellState extends ConsumerState<HomeShell> with WidgetsBindingObserv
     WidgetsBinding.instance.addObserver(this);
     WidgetsBinding.instance.addPostFrameCallback((_) async {
       _touch();
-      // One prompt at a time: notifications first, then ad consent.
-      await ref.read(pushServiceProvider).registerForCurrentUser(context);
+      // Start listening for new matches/messages (top banners + bell).
+      ref.read(notificationCenterProvider);
+      // One prompt at a time: notifications + location first, then ad consent.
+      if (await shouldShowPermissionsIntro() && mounted) await context.push(Routes.permissions);
+      await ref.read(pushServiceProvider).registerForCurrentUser();
+      // Keep "people near you" accurate: refresh the location if already allowed.
+      ref.read(locationServiceProvider).refreshIfAllowed().ignore();
+      // Publish this phone's public key so matches can send encrypted messages.
+      publishMyChatKey(
+        ref.read(chatCryptoProvider),
+        ref.read(chatRepositoryProvider),
+      ).catchError((Object e) => debugPrint('Chat key publish failed: $e'));
       if (mounted) await ref.read(adsReadyProvider.notifier).start();
     });
   }
@@ -40,6 +56,8 @@ class _HomeShellState extends ConsumerState<HomeShell> with WidgetsBindingObserv
     if (state == AppLifecycleState.resumed) {
       _touch();
       ref.read(inboxProvider.notifier).refresh();
+      // Picks up approvals/rejections made while the app was in the background.
+      ref.read(myProfileProvider.notifier).refresh().ignore();
     }
   }
 
@@ -86,6 +104,49 @@ class _HomeShellState extends ConsumerState<HomeShell> with WidgetsBindingObserv
             label: 'Profile',
           ),
         ],
+      ),
+    );
+  }
+}
+
+/// Keeps every tab alive (like an IndexedStack) but crossfades between them
+/// instead of cutting.
+class FadingBranchContainer extends StatelessWidget {
+  const FadingBranchContainer({super.key, required this.currentIndex, required this.children});
+
+  final int currentIndex;
+  final List<Widget> children;
+
+  @override
+  Widget build(BuildContext context) {
+    return Stack(
+      fit: StackFit.expand,
+      children: [for (var i = 0; i < children.length; i++) _Branch(active: i == currentIndex, child: children[i])],
+    );
+  }
+}
+
+class _Branch extends StatelessWidget {
+  const _Branch({required this.active, required this.child});
+  final bool active;
+  final Widget child;
+
+  @override
+  Widget build(BuildContext context) {
+    return IgnorePointer(
+      ignoring: !active,
+      child: ExcludeFocus(
+        excluding: !active,
+        child: TickerMode(
+          // Hidden tabs pause their animations.
+          enabled: active,
+          child: AnimatedOpacity(
+            opacity: active ? 1 : 0,
+            duration: const Duration(milliseconds: 200),
+            curve: Curves.easeOut,
+            child: child,
+          ),
+        ),
       ),
     );
   }

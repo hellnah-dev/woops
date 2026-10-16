@@ -70,7 +70,13 @@ class _MatchOverlayState extends State<_MatchOverlay> with SingleTickerProviderS
           border: Border.all(color: Colors.white, width: 4),
           boxShadow: const [BoxShadow(color: Colors.black45, blurRadius: 20)],
         ),
-        child: ProfilePhoto(storagePath: path, borderRadius: BorderRadius.circular(AppRadius.lg - 4)),
+        // Same decode size as the Discover card, so the photo is already in
+        // memory and doesn't flash in mid-animation.
+        child: ProfilePhoto(
+          storagePath: path,
+          memCacheWidth: 1080,
+          borderRadius: BorderRadius.circular(AppRadius.lg - 4),
+        ),
       ),
     );
 

@@ -34,6 +34,14 @@ class AppTheme {
 
     return base.copyWith(
       scaffoldBackgroundColor: scheme.surface,
+      // Smooth, consistent screen transitions on both platforms.
+      pageTransitionsTheme: const PageTransitionsTheme(
+        builders: {
+          TargetPlatform.android: FadeForwardsPageTransitionsBuilder(),
+          TargetPlatform.iOS: CupertinoPageTransitionsBuilder(),
+        },
+      ),
+      splashFactory: InkSparkle.splashFactory,
       textTheme: text,
       appBarTheme: AppBarTheme(
         backgroundColor: scheme.surface,
@@ -41,7 +49,8 @@ class AppTheme {
         elevation: 0,
         scrolledUnderElevation: 0.5,
         centerTitle: false,
-        titleTextStyle: text.titleLarge?.copyWith(color: scheme.onSurface, fontWeight: FontWeight.w800),
+        toolbarHeight: 52,
+        titleTextStyle: text.titleLarge?.copyWith(color: scheme.onSurface, fontWeight: FontWeight.w800, fontSize: 20),
       ),
       filledButtonTheme: FilledButtonThemeData(
         style: FilledButton.styleFrom(
@@ -65,10 +74,15 @@ class AppTheme {
         filled: true,
         fillColor: fieldFill,
         contentPadding: const EdgeInsets.symmetric(horizontal: 18, vertical: 16),
-        border: OutlineInputBorder(borderRadius: BorderRadius.circular(AppRadius.md), borderSide: BorderSide.none),
+        // A faint outline (not none): a floating label sits in the outline's
+        // notch, so without one it hovers half outside the box once filled.
+        border: OutlineInputBorder(
+          borderRadius: BorderRadius.circular(AppRadius.md),
+          borderSide: BorderSide(color: AppColors.rose.withValues(alpha: isDark ? 0.3 : 0.18)),
+        ),
         enabledBorder: OutlineInputBorder(
           borderRadius: BorderRadius.circular(AppRadius.md),
-          borderSide: BorderSide.none,
+          borderSide: BorderSide(color: AppColors.rose.withValues(alpha: isDark ? 0.3 : 0.18)),
         ),
         focusedBorder: OutlineInputBorder(
           borderRadius: BorderRadius.circular(AppRadius.md),

@@ -109,3 +109,15 @@ pre.stack { white-space: pre-wrap; font-size: 12px; background: var(--bg); paddi
 .empty { padding: 40px; text-align: center; color: var(--muted); }
 dialog { border: 1px solid var(--border); border-radius: 14px; background: var(--surface); color: var(--text); padding: 20px; max-width: 440px; width: calc(100% - 32px); }
 dialog::backdrop { background: rgba(0,0,0,.4); }
+
+/* Full-screen image viewer */
+img[data-zoom] { cursor: zoom-in; }
+.viewer { position: fixed; inset: 0; z-index: 100; background: rgba(10, 6, 12, .92); display: grid; place-items: center; padding: 56px 16px 40px; overflow: auto; }
+.viewer img { max-width: 100%; max-height: calc(100vh - 110px); object-fit: contain; border-radius: 8px; cursor: zoom-in; transition: transform .15s; }
+.viewer img.zoomed { max-height: none; max-width: none; width: auto; cursor: zoom-out; }
+.viewer-close { position: fixed; top: 14px; right: 14px; width: 44px; height: 44px; border-radius: 50%; border: 0; background: #fff; color: #222; font-size: 20px; cursor: pointer; box-shadow: 0 4px 16px rgba(0,0,0,.4); }
+.viewer-caption { position: fixed; bottom: 12px; left: 0; right: 0; text-align: center; color: #eee; font-size: 14px; }
+.chips { display: flex; flex-wrap: wrap; gap: 6px; margin-bottom: 10px; }
+.chip { border: 1px solid var(--border); background: var(--bg); color: var(--text); border-radius: 999px; padding: 4px 10px; font-size: 13px; cursor: pointer; }
+.chip:hover { border-color: var(--primary); }
+.missing-file { display: grid; place-items: center; min-height: 140px; border: 2px dashed var(--border); border-radius: 12px; color: var(--muted); font-size: 13px; text-align: center; padding: 10px; }

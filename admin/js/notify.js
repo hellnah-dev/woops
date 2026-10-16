@@ -1,4 +1,4 @@
-import { rpc, supabase } from './api.js';
+import { removeFiles, rpc, supabase } from './api.js';
 import { $, toast } from './ui.js';
 
 // Live alerts: new reports, verification requests and app errors arrive over
@@ -10,6 +10,7 @@ export async function refreshBadges() {
     const s = await rpc('admin_stats');
     $('#badge-reports').textContent = s.reports_open || '';
     $('#badge-verifications').textContent = s.verifications_pending || '';
+    $('#badge-age-checks').textContent = s.age_checks_pending || '';
     $('#badge-errors').textContent = s.errors_unresolved || '';
   } catch { /* ignore */ }
 }
@@ -38,6 +39,10 @@ export function startRealtime() {
       toast('New verification request', { onClick: () => (location.hash = '#/verifications') });
       desktop('Woops', 'New verification request');
     }),
+    on('age_verifications', (row) => {
+      toast(`New ID to review (${row.document_type})`, { onClick: () => (location.hash = '#/age-checks') });
+      desktop('Woops', 'New ID document to review');
+    }),
     on('app_errors', (row) => {
       const msg = `App error: ${String(row.message).slice(0, 120)}`;
       toast(msg, { type: 'error', onClick: () => (location.hash = '#/errors') });
@@ -54,4 +59,31 @@ export function startRealtime() {
   channel.subscribe();
   refreshBadges();
   setInterval(refreshBadges, 60_000);
+  cleanupExpiredProofs();
+  setInterval(cleanupExpiredProofs, 6 * 60 * 60 * 1000);
+}
+
+/**
+ * Deletes ID documents and selfies older than 7 days (and expires reviews that
+ * waited that long). The scheduled cleanup-proofs Edge Function does the same;
+ * running it here too means files are removed even without the schedule.
+ * Never interrupts the admin: failures are only logged and retried later.
+ */
+export async function cleanupExpiredProofs() {
+  try {
+    const rows = await rpc('admin_claim_expired_proofs');
+    if (!rows?.length) return;
+    const byBucket = {};
+    for (const r of rows) (byBucket[r.bucket] ??= []).push(r.path);
+    let removed = 0;
+    for (const [bucket, paths] of Object.entries(byBucket)) {
+      try { await removeFiles(bucket, paths); removed += paths.length; }
+      catch (e) { console.warn('Proof cleanup failed for', bucket, e); }
+    }
+    if (removed) toast(`Deleted ${removed} proof file(s) older than 7 days.`, { type: 'ok', timeout: 4000 });
+    refreshBadges();
+  } catch (e) {
+    // Older database without the cleanup function, or offline: try again later.
+    console.warn('Proof cleanup skipped:', e?.message ?? e);
+  }
 }

@@ -3,6 +3,7 @@ import 'package:flutter_riverpod/flutter_riverpod.dart';
 import 'package:package_info_plus/package_info_plus.dart';
 import 'package:url_launcher/url_launcher.dart';
 
+import '../../../core/config/app_info.dart';
 import '../../../core/config/env.dart';
 import '../../../core/theme/app_colors.dart';
 import '../../../core/widgets/app_logo.dart';
@@ -22,10 +23,10 @@ class AboutScreen extends ConsumerWidget {
     final version = info == null ? '' : 'Version ${info.version} (build ${info.buildNumber})';
 
     Widget fact(IconData icon, String title, String text) => ListTile(
-          leading: Icon(icon, color: theme.colorScheme.primary),
-          title: Text(title),
-          subtitle: Text(text),
-        );
+      leading: Icon(icon, color: theme.colorScheme.primary),
+      title: Text(title),
+      subtitle: Text(text),
+    );
 
     return Scaffold(
       appBar: AppBar(title: const Text('About')),
@@ -57,7 +58,11 @@ class AboutScreen extends ConsumerWidget {
               textAlign: TextAlign.center,
             ),
           ),
-          fact(Icons.lock_outline_rounded, 'Your privacy', 'Exact location never stored; photos stripped of hidden data.'),
+          fact(
+            Icons.lock_outline_rounded,
+            'Your privacy',
+            'Exact location never stored; photos stripped of hidden data.',
+          ),
           fact(Icons.verified_user_outlined, 'Adults only', '18+, or older where local law requires.'),
           fact(Icons.shield_outlined, 'Safety first', 'Block and report anyone; reports are confidential.'),
           const Divider(height: 32),
@@ -69,10 +74,22 @@ class AboutScreen extends ConsumerWidget {
               onTap: () => openLegal(context, doc),
             ),
           ListTile(
+            leading: const Icon(Icons.support_agent_rounded),
+            title: const Text('Support'),
+            subtitle: const Text('kamaucha.me/rammy24d'),
+            trailing: const Icon(Icons.open_in_new_rounded, size: 18),
+            onTap: () => launchUrl(Uri.parse(AppInfo.supportUrl), mode: LaunchMode.externalApplication),
+          ),
+          ListTile(
             leading: const Icon(Icons.mail_outline_rounded),
-            title: const Text('Contact support'),
+            title: const Text('Email support'),
             subtitle: const Text(Env.supportEmail),
             onTap: () => launchUrl(Uri.parse('mailto:${Env.supportEmail}?subject=Woops%20support%20($version)')),
+          ),
+          const ListTile(
+            leading: Icon(Icons.business_rounded),
+            title: Text('${AppInfo.product} by ${AppInfo.company}'),
+            subtitle: Text('Developed by ${AppInfo.developer}'),
           ),
           ListTile(
             leading: const Icon(Icons.code_rounded),
@@ -81,7 +98,8 @@ class AboutScreen extends ConsumerWidget {
               context: context,
               applicationName: 'Woops',
               applicationVersion: version,
-              applicationLegalese: '© ${DateTime.now().year} Woops',
+              applicationLegalese:
+                  '© ${DateTime.now().year} ${AppInfo.company} · ${AppInfo.product} by ${AppInfo.developer}',
             ),
           ),
         ],

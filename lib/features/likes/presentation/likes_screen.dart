@@ -39,10 +39,19 @@ class LikesScreen extends ConsumerWidget {
       appBar: AppBar(title: const Text('Likes')),
       bottomNavigationBar: const BannerAdSlot(),
       body: likes.when(
+        // A failed refresh keeps the list on screen (and says so in a snack).
+        skipError: true,
         loading: () => const LoadingView(),
         error: (e, _) => ErrorView(error: e, onRetry: () => ref.invalidate(likesReceivedProvider)),
         data: (cards) => RefreshIndicator(
-          onRefresh: () => ref.refresh(likesReceivedProvider.future),
+          onRefresh: () => ref
+              .refresh(likesReceivedProvider.future)
+              .then<void>(
+                (_) {},
+                onError: (Object e) {
+                  if (context.mounted) showSnack(context, e);
+                },
+              ),
           child: cards.isEmpty
               ? ListView(
                   children: const [
@@ -81,6 +90,11 @@ class LikesScreen extends ConsumerWidget {
                         itemBuilder: (context, i) =>
                             _LikeTile(card: cards[i], onTap: () => _open(context, ref, cards[i])),
                       ),
+                    ),
+                    // One paced "Sponsored" card below the likes (hidden when pacing says no).
+                    const SliverPadding(
+                      padding: EdgeInsets.fromLTRB(AppSpacing.md, 0, AppSpacing.md, AppSpacing.lg),
+                      sliver: SliverToBoxAdapter(child: NativeAdCard()),
                     ),
                   ],
                 ),

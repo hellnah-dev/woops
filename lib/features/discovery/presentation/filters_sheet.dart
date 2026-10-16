@@ -117,7 +117,7 @@ class _FiltersSheetState extends ConsumerState<FiltersSheet> {
                           label: Text(p.countryCodes.isEmpty ? 'Choose countries' : 'Edit'),
                           onPressed: () async {
                             final chosen = await showCountryMultiPicker(context, selected: p.countryCodes);
-                            if (chosen != null) setState(() => _prefs = p.copyWith(countryCodes: chosen));
+                            if (chosen != null && mounted) setState(() => _prefs = p.copyWith(countryCodes: chosen));
                           },
                         ),
                       ],

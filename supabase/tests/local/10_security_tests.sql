@@ -92,12 +92,22 @@ select public.accept_legal_documents('2026-10-14');
 select public.complete_onboarding();
 
 -- -----------------------------------------------------------------------------
+-- "Ready to date": an incomplete profile cannot like or pass
+-- -----------------------------------------------------------------------------
+select tests.login(:B);
+select tests.throws($q$select public.swipe('aaaaaaaa-0000-0000-0000-000000000001', 'like')$q$,
+                    '%profile_not_ready%', 'incomplete profile cannot swipe');
+reset role;
+select tests.make_ready(u) from unnest(array[:A, :B, :C, :D]::uuid[]) u;
+set role authenticated;
+
+-- -----------------------------------------------------------------------------
 -- Privacy of private tables
 -- -----------------------------------------------------------------------------
 select tests.login(:B);
 select tests.ok((select count(*) from public.profiles) = 1, 'profiles table only returns own row');
 select tests.ok((select count(*) from public.profile_locations) = 1, 'locations table only returns own row');
-select tests.ok((select count(*) from public.profile_photos) = 1, 'photos table only returns own rows');
+select tests.ok((select count(*) from public.profile_photos where user_id <> :B) = 0, 'photos table only returns own rows');
 select tests.ok(not exists (select 1 from public.discovery_preferences where user_id = :A),
                 'cannot read other users'' discovery preferences');
 update public.privacy_settings set discoverable = false where user_id = :A;  -- silently affects 0 rows
@@ -114,8 +124,12 @@ select tests.ok((select discoverable from public.privacy_settings), 'another use
 -- Discovery respects mutual preferences
 -- -----------------------------------------------------------------------------
 select tests.login(:A);
-select tests.ok((select array_agg(id order by id) from public.get_discovery_feed(20))
-                = array[:B::uuid, :C::uuid], 'A (wants men) sees B and C, not D');
+select tests.ok((select array_agg(id order by id) from public.get_discovery_feed(20) where not is_random)
+                = array[:B::uuid, :C::uuid], 'A (wants men) matches B and C, not D');
+select tests.ok((select is_random from public.get_discovery_feed(20) where id = :D),
+                'D (outside A''s filters) is shown to A as a random pick');
+select tests.ok((select bool_and(not is_random) from public.get_discovery_feed(20) where id in (:B, :C)),
+                'matches come first and are not marked random');
 select tests.ok((select distance_km from public.get_discovery_feed(20) where id = :B) between 1 and 5,
                 'distance is shown rounded in km');
 select tests.ok(not exists (select 1 from public.get_discovery_feed(20) f
@@ -123,14 +137,18 @@ select tests.ok(not exists (select 1 from public.get_discovery_feed(20) f
                 'feed exposes no coordinates or birthdate');
 
 select tests.login(:D);
-select tests.ok(not exists (select 1 from public.get_discovery_feed(20) where id in (:A, :B, :C)),
-                'D (wants women) does not see A (wants men) or the men');
+select tests.ok(not exists (select 1 from public.get_discovery_feed(20) where not is_random),
+                'nobody matches D''s own filters');
+select tests.ok((select count(*) from public.get_discovery_feed(20) where is_random and id in (:A, :B, :C)) = 3,
+                'instead of an empty feed, D gets random picks: everyone, men included');
 
 select tests.login(:B);
 select tests.ok(exists (select 1 from public.get_discovery_feed(20) where id = :A), 'B sees A');
-select tests.ok(not exists (select 1 from public.get_discovery_feed(20) where id = :D), 'B does not see D (D wants women only)');
-select tests.throws($q$select public.swipe('dddddddd-0000-0000-0000-000000000004', 'like')$q$,
-                    '%unavailable%', 'cannot like someone whose preferences exclude you');
+select tests.ok(not (select is_random from public.get_discovery_feed(20) where id = :A), 'A is a real match for B');
+select tests.ok((select is_random from public.get_discovery_feed(20) where id = :D),
+                'D (wants women only) is not a match for B, but appears as a random pick');
+select tests.ok((public.swipe(:D, 'like') ->> 'matched')::boolean = false,
+                'B can like a random pick even if it is outside their preferences');
 
 -- -----------------------------------------------------------------------------
 -- Likes cannot be forged; matching is mutual and unique
@@ -145,7 +163,10 @@ select tests.throws($q$select public.swipe('bbbbbbbb-0000-0000-0000-000000000002
                     '%yourself%', 'cannot swipe on yourself');
 
 select tests.ok((public.swipe(:A, 'like') ->> 'matched')::boolean = false, 'one-sided like does not match');
-select tests.ok(not exists (select 1 from public.get_discovery_feed(20) where id = :A), 'swiped profiles leave the feed');
+select tests.ok(not exists (select 1 from public.get_discovery_feed(20) where id = :A and not is_repeat),
+                'swiped profiles leave the new-people part of the feed');
+select tests.ok((select is_repeat from public.get_discovery_feed(20) where id = :A),
+                'when new people run out, swiped profiles come back as repeats');
 
 select tests.login(:A);
 select tests.ok(exists (select 1 from public.get_likes_received() where id = :B), 'A sees B in likes received');
@@ -181,7 +202,12 @@ select tests.login(:B);
 select tests.ok((select unread_count from public.get_my_conversations()) = 1, 'B has 1 unread message');
 select tests.ok((select count(*) from public.messages) = 1, 'B can read the conversation');
 select public.mark_conversation_read(current_setting('test.conv')::uuid);
-select tests.ok((select unread_count from public.get_my_conversations()) = 0, 'mark read clears unread count');
+select tests.ok((select count(*) from public.get_pending_messages()) = 1, 'B downloads the waiting message');
+select tests.ok(public.ack_messages(array(select id from public.get_pending_messages())) = 1, 'B acknowledges it');
+select tests.ok((select count(*) from public.messages) = 0, 'delivered messages are deleted from the server');
+select tests.ok((select unread_count from public.get_my_conversations()) = 0, 'nothing left waiting after delivery');
+select tests.ok((select last_message_at from public.get_my_conversations()) is not null,
+                'conversation keeps its last activity time');
 
 select tests.login(:A);
 select tests.ok(exists (select 1 from public.read_receipts where user_id = :B), 'A sees B''s read receipt');
@@ -198,6 +224,30 @@ select tests.throws($q$select public.mark_conversation_read(current_setting('tes
 select tests.ok(not exists (select 1 from public.public_profiles where id in (:A, :B)),
                 'C cannot browse A/B via public_profiles');
 
+-- End-to-end encryption keys: only matches can read them
+select tests.login(:A);
+select public.set_my_chat_key('AAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAA=');
+select tests.login(:B);
+select tests.ok(public.get_chat_key(:A) = 'AAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAA=', 'a match can fetch your public key');
+select tests.throws('select * from public.chat_keys', '%permission denied%', 'the key table is not directly readable');
+select tests.login(:C);
+select tests.ok(public.get_chat_key(:A) is null, 'strangers cannot fetch your public key');
+
+-- Encrypted text and photo messages
+select tests.login(:A);
+select tests.ok((public.send_message(current_setting('test.conv')::uuid, repeat('x', 5000), gen_random_uuid(), 'text', null, true)
+                 ).metadata ->> 'e2e' = 'true', 'ciphertext may be longer and is flagged e2e');
+select tests.throws($q$select public.send_message(current_setting('test.conv')::uuid, repeat('x', 5000), gen_random_uuid())$q$,
+                    '%message_too_long%', 'plain text keeps the 2000-character limit');
+select tests.throws($q$select public.send_message(current_setting('test.conv')::uuid, 'k', gen_random_uuid(), 'image',
+                       'bbbbbbbb-0000-0000-0000-000000000002/x/y.bin', true)$q$,
+                    '%invalid_media%', 'photo must be in your own folder for this conversation');
+select tests.ok((public.send_message(current_setting('test.conv')::uuid, 'k', gen_random_uuid(), 'image',
+                 'aaaaaaaa-0000-0000-0000-000000000001/' || current_setting('test.conv') || '/p.bin', true)).kind = 'image',
+                'photo messages can be sent');
+select tests.login(:B);
+select public.ack_messages(array(select id from public.get_pending_messages()));
+
 -- Rate limit: 30 messages / minute (B has sent none yet)
 select tests.login(:B);
 do $$
@@ -208,6 +258,42 @@ begin
 end $$;
 select tests.throws($q$select public.send_message(current_setting('test.conv')::uuid, 'one too many', gen_random_uuid())$q$,
                     '%rate_limited%', 'message rate limit is enforced');
+
+-- -----------------------------------------------------------------------------
+-- 5 MB media allowance per person
+-- -----------------------------------------------------------------------------
+select tests.login(:A);
+select tests.ok((public.get_my_media_usage() ->> 'limit_bytes')::int = 5242880, 'the allowance is 5 MB');
+insert into storage.objects (bucket_id, name, metadata)
+values ('profile-photos', 'aaaaaaaa-0000-0000-0000-000000000001/big.jpg', '{"size": 5300000}');
+select tests.ok((public.get_my_media_usage() ->> 'used_bytes')::bigint >= 5300000, 'usage adds up my files');
+select tests.throws($q$insert into storage.objects (bucket_id, name, metadata)
+                       values ('profile-photos', 'aaaaaaaa-0000-0000-0000-000000000001/more.jpg', '{"size": 1000}')$q$,
+                    '%row-level security%', 'uploads stop once 5 MB is used');
+select tests.throws($q$insert into storage.objects (bucket_id, name)
+                       values ('chat-media', 'aaaaaaaa-0000-0000-0000-000000000001/' || current_setting('test.conv') || '/m.bin')$q$,
+                    '%row-level security%', 'chat photos count towards the same 5 MB');
+reset role;
+delete from storage.objects where name = 'aaaaaaaa-0000-0000-0000-000000000001/big.jpg';
+set role authenticated;
+select tests.login(:A);
+insert into storage.objects (bucket_id, name, metadata)
+values ('chat-media', 'aaaaaaaa-0000-0000-0000-000000000001/' || current_setting('test.conv') || '/m.bin', '{"size": 200000}');
+select tests.login(:B);
+select tests.ok(exists (select 1 from storage.objects where bucket_id = 'chat-media'), 'the recipient can download a chat photo');
+delete from storage.objects where bucket_id = 'chat-media';
+select tests.ok(not exists (select 1 from storage.objects where bucket_id = 'chat-media'), 'the recipient deletes it after saving');
+select tests.login(:C);
+select tests.ok(not exists (select 1 from storage.objects where bucket_id = 'chat-media'), 'outsiders cannot see chat photos');
+-- A file elsewhere with an odd path never breaks storage queries.
+reset role;
+insert into storage.objects (bucket_id, name) values ('profile-photos', 'cccccccc-0000-0000-0000-000000000003/not-a-uuid/x.jpg');
+set role authenticated;
+select tests.login(:A);
+select tests.ok((select count(*) from storage.objects) >= 0, 'odd paths in other buckets don''t break chat-media rules');
+reset role;
+delete from storage.objects where name = 'cccccccc-0000-0000-0000-000000000003/not-a-uuid/x.jpg';
+set role authenticated;
 
 -- -----------------------------------------------------------------------------
 -- Storage photo visibility
@@ -222,10 +308,9 @@ select tests.login(:A);
 select tests.ok(public.report_user(:C, 'spam', 'Sends links') is not null, 'A can report C');
 select tests.throws($q$select public.report_user('cccccccc-0000-0000-0000-000000000003', 'bad_reason')$q$,
                     '%invalid_reason%', 'report reason is validated');
-select tests.throws($q$select public.report_user('cccccccc-0000-0000-0000-000000000003', 'spam', null,
-                         (select id from public.messages limit 1))$q$,
-                    '%invalid_message%', 'cannot attach a message the target did not send');
-select tests.ok((select count(*) from public.reports) = 1, 'reporter sees own report');
+select tests.ok(public.report_user(:C, 'harassment', null, 'copy of the rude message') is not null,
+                'a report can include a copy of the message');
+select tests.ok((select count(*) from public.reports) = 2, 'reporter sees own reports');
 select tests.login(:C);
 select tests.ok((select count(*) from public.reports) = 0, 'reported user cannot see reports about them');
 
@@ -311,8 +396,10 @@ select tests.ok(exists (select 1 from public.get_discovery_feed(20) where id = :
 select tests.ok((select country_code from public.get_discovery_feed(20) where id = :H) = 'FJ',
                 'feed includes country code');
 update public.discovery_preferences set country_codes = array['NP'];
-select tests.ok(not exists (select 1 from public.get_discovery_feed(20) where id = :H),
-                'country filter excludes other countries');
+select tests.ok(not exists (select 1 from public.get_discovery_feed(20) where id = :H and not is_random),
+                'country filter excludes other countries from matches');
+select tests.ok((select is_random from public.get_discovery_feed(20) where id = :H),
+                'people outside the country filter can still appear as random picks');
 update public.discovery_preferences set country_codes = array['FJ'];
 select tests.ok(exists (select 1 from public.get_discovery_feed(20) where id = :H),
                 'country filter includes chosen country');
@@ -365,6 +452,8 @@ select tests.throws($q$update public.profiles set country_code = 'KR'$q$,
 select public.log_client_error('Null check operator used on a null value', 'at chat_screen.dart:120', '{}', 'ios', '1.0.0');
 
 select tests.throws('select public.admin_stats()', '%forbidden%', 'regular users cannot call admin_stats');
+select tests.throws($q$select public.admin_reset_age_check('bbbbbbbb-0000-0000-0000-000000000002')$q$,
+                    '%forbidden%', 'regular users cannot reset age checks');
 select tests.throws($q$select public.admin_set_user_status('bbbbbbbb-0000-0000-0000-000000000002', 'banned')$q$,
                     '%forbidden%', 'regular users cannot ban people');
 select tests.throws($q$select public.admin_upsert_age_rule('NP', 18)$q$, '%forbidden%', 'regular users cannot edit age rules');
@@ -383,14 +472,71 @@ select tests.throws($q$select public.request_verification('bbbbbbbb-0000-0000-00
 select tests.login(:C);
 select tests.ok((select count(*) from public.verification_requests) = 0, 'users cannot see others'' verification requests');
 
+-- Map: approximate positions only
+select tests.login(:G);
+update public.discovery_preferences set country_codes = '{}';
+select tests.ok(exists (select 1 from public.get_map_people() where id = :H), 'map shows people from the feed');
+select tests.ok((select abs(lat / 0.02 - round(lat / 0.02)) < 1e-6 from public.get_map_people() where id = :H),
+                'map positions are snapped to a ~2 km grid');
+select tests.ok((select count(*) from public.get_my_location()) = 1, 'I can read my own saved location');
+
+-- ID document age review
+select tests.login(:F);
+select tests.throws($q$select public.submit_age_verification('Passport', 'bbbbbbbb-0000-0000-0000-000000000002/id.jpg')$q$,
+                    '%check%', 'ID document must be in your own folder');
+select public.submit_age_verification('Citizenship certificate', 'ffffffff-0000-0000-0000-000000000006/id.jpg');
+select tests.throws($q$select public.submit_age_verification('Passport', 'ffffffff-0000-0000-0000-000000000006/id2.jpg')$q$,
+                    '%already_pending%', 'only one pending ID review at a time');
+select tests.throws('select document_path from public.age_verifications', '%permission denied%',
+                    'users cannot read the stored document path');
+select tests.throws($q$update public.profiles set age_verified = true$q$, '%permission denied%', 'cannot self-confirm age');
+select tests.login(:C);
+select tests.ok((select count(*) from public.age_verifications) = 0, 'users cannot see others'' ID reviews');
+
 -- Admin
 select tests.login(:Z);
+select tests.ok((select min_age from public.admin_list_age_verifications() where user_id = :F) = 18,
+                'admin sees the country minimum age next to the ID');
+select tests.ok(public.admin_review_age_verification(
+                  (select id from public.admin_list_age_verifications() where user_id = :F), true)
+                like 'ffffffff%', 'review returns the document path so the file can be deleted');
+select tests.ok((select document_path is null and status = 'approved' from public.admin_list_age_verifications(null) where user_id = :F),
+                'document path is cleared after review');
+select tests.ok((public.admin_get_user(:F) -> 'profile' ->> 'age_verified')::boolean, 'approving confirms the user''s age');
+select tests.ok((public.admin_get_user(:F) -> 'age_checks' -> 0 ->> 'status') = 'approved', 'admin sees a user''s ID check history');
+select tests.ok(not ((public.admin_get_user(:F) -> 'age_checks' -> 0) ? 'document_path'), 'ID history never includes the file path');
+select tests.ok((public.admin_get_user(:B) -> 'readiness' ->> 'ready')::boolean, 'admin sees whether a user is ready to match');
+select tests.ok((public.admin_stats() ->> 'age_checks_pending') is not null
+                and (public.admin_stats() ->> 'users_ready')::int >= 1, 'admin_stats includes ID checks and ready users');
+select tests.ok((public.admin_stats() ->> 'messages_24h')::int >= 1, 'messages_24h counts sends even after delivery');
+select public.admin_reset_age_check(:F, 'test');
+reset role;
+select set_config('test.photo', (select id::text from public.profile_photos where user_id = :F limit 1), false);
+set role authenticated;
+select tests.login(:Z);
+select tests.throws($q$select public.admin_delete_photo(current_setting('test.photo')::uuid)$q$,
+                    '%reason_required%', 'removing a photo needs a reason');
+select public.admin_delete_photo(current_setting('test.photo')::uuid, 'Face not visible');
+set role authenticated;
+select tests.login(:F);
+select tests.ok((select body from public.get_my_notices() limit 1) like '%Face not visible%', 'the user is told why their photo was removed');
+select public.mark_notices_read(array(select id from public.get_my_notices()));
+select tests.ok(not exists (select 1 from public.get_my_notices()), 'notices can be marked read');
+select tests.login(:G);
+select tests.ok(not exists (select 1 from public.user_notices), 'users cannot see other people''s notices');
+select tests.login(:Z);
+select tests.ok(not (public.admin_get_user(:F) -> 'profile' ->> 'age_verified')::boolean, 'admin can reset an age check');
 select tests.ok(public.is_admin(), 'admin is recognised');
 select tests.ok((public.admin_stats() ->> 'verifications_pending')::int = 1, 'admin_stats counts pending verifications');
 select tests.ok((select count(*) from public.admin_search_users('bikash')) = 1, 'admin can search users by name');
 select tests.ok((public.admin_get_user(:B) -> 'profile' ->> 'email') = 'b@test.dev', 'admin can examine a user');
 select tests.ok((select count(*) from public.admin_list_errors()) = 2, 'admin sees grouped app errors');
-select public.admin_review_verification((select id from public.admin_list_verifications() limit 1), true);
+select tests.throws($q$select public.admin_review_verification((select id from public.admin_list_verifications() limit 1), false)$q$,
+                    '%reason_required%', 'rejecting a verification needs a reason');
+select tests.ok(public.admin_review_verification((select id from public.admin_list_verifications() limit 1), true)
+                = 'bbbbbbbb-0000-0000-0000-000000000002/selfie.jpg', 'review returns the selfie path so it can be deleted');
+select tests.ok((select selfie_path is null from public.admin_list_verifications(null) where user_id = :B),
+                'selfie path is cleared after review');
 select tests.ok((public.admin_get_user(:B) -> 'profile' ->> 'is_verified')::boolean, 'approving verification marks the user verified');
 select tests.ok((select count(*) from public.admin_list_reports('open')) >= 1, 'admin sees open reports');
 select public.admin_resolve_report((select id from public.admin_list_reports('open') where reported_id = :C limit 1),
@@ -474,6 +620,47 @@ select tests.login(:H);
 update public.privacy_settings set show_zodiac = false;
 select tests.login(:G);
 select tests.ok((select zodiac from public.get_discovery_feed(20) where id = :H) is null, 'hidden zodiac is not shared');
+reset role;
+
+-- -----------------------------------------------------------------------------
+-- Random picks fill an empty feed and can be liked
+-- -----------------------------------------------------------------------------
+set role authenticated;
+select tests.login(:G);
+update public.discovery_preferences set country_codes = array['NP'];
+select tests.ok((select is_random from public.get_discovery_feed(20) where id = :H), 'H is a random pick for G');
+reset role;
+select tests.make_ready(:G);
+set role authenticated;
+select tests.login(:G);
+select tests.ok((public.swipe(:H, 'like') ->> 'matched')::boolean = false, 'liking a random pick works');
+select tests.ok(not exists (select 1 from public.get_discovery_feed(20) where id = :H and not is_repeat),
+                'a liked random pick leaves the new-people part of the feed');
+select tests.ok((select is_repeat from public.get_discovery_feed(20) where id = :H), 'and comes back later as a repeat');
+select public.swipe(:H, 'pass');
+reset role;
+select tests.ok((select action from public.swipes where swiper_id = :G and swipee_id = :H) = 'pass',
+                'swiping a repeat again replaces the old swipe');
+
+-- -----------------------------------------------------------------------------
+-- Proof files never live longer than 7 days
+-- -----------------------------------------------------------------------------
+insert into public.age_verifications (user_id, country_code, document_type, document_path, created_at)
+values (:G, 'FJ', 'Passport', '99999999-0000-0000-0000-000000000007/old.jpg', now() - interval '8 days');
+insert into storage.objects (bucket_id, name, created_at) values
+  ('id-documents', '99999999-0000-0000-0000-000000000007/old.jpg', now() - interval '8 days'),
+  ('id-documents', '99999999-0000-0000-0000-000000000007/new.jpg', now());
+set role authenticated;
+select tests.login(:G);
+select tests.throws('select * from public.admin_claim_expired_proofs()', '%forbidden%', 'users cannot run the proof cleanup');
+select tests.throws('select * from public.service_claim_expired_proofs()', '%permission denied%',
+                    'only the service role can run the scheduled cleanup');
+select tests.login(:Z);
+select tests.ok((select array_agg(path) from public.admin_claim_expired_proofs())
+                = array['99999999-0000-0000-0000-000000000007/old.jpg'], 'cleanup lists only proof files older than 7 days');
+select tests.ok((select status = 'rejected' and document_path is null and reject_reason like 'Not reviewed within 7 days%'
+                   from public.admin_list_age_verifications(null) where user_id = :G),
+                'a review still pending after 7 days expires, with a reason');
 reset role;
 
 -- -----------------------------------------------------------------------------

@@ -16,7 +16,12 @@ class ProfilePhoto extends ConsumerWidget {
     this.borderRadius,
     this.memCacheWidth,
     this.thumbnail = false,
+    this.placeholder,
   });
+
+  /// Shown while loading instead of the plain colour (e.g. a smaller copy
+  /// that is already cached).
+  final Widget? placeholder;
 
   final String? storagePath;
 
@@ -51,7 +56,7 @@ class ProfilePhoto extends ConsumerWidget {
         fit: fit,
         memCacheWidth: memCacheWidth,
         fadeInDuration: const Duration(milliseconds: 180),
-        placeholder: (context, url) => Container(color: scheme.surfaceContainerHighest),
+        placeholder: (context, url) => this.placeholder ?? Container(color: scheme.surfaceContainerHighest),
         errorWidget: (context, url, error) => thumbnail
             ? ProfilePhoto(storagePath: path, fit: fit, memCacheWidth: memCacheWidth)
             : Container(
@@ -64,6 +69,26 @@ class ProfilePhoto extends ConsumerWidget {
 
     if (borderRadius == null) return child;
     return ClipRRect(borderRadius: borderRadius!, child: child);
+  }
+}
+
+/// Warms the image cache for [storagePaths] so they appear without a
+/// placeholder flash. Pass the same [memCacheWidth] the [ProfilePhoto] uses,
+/// otherwise a differently sized copy is cached.
+void precacheProfilePhotos(
+  BuildContext context,
+  PhotoUrlResolver resolver,
+  Iterable<String> storagePaths, {
+  int? memCacheWidth,
+}) {
+  for (final path in storagePaths) {
+    if (path.isEmpty) continue;
+    final provider = ResizeImage.resizeIfNeeded(
+      memCacheWidth,
+      null,
+      CachedNetworkImageProvider(resolver.url(path), cacheKey: path, headers: resolver.headers),
+    );
+    precacheImage(provider, context, onError: (_, _) {}).ignore();
   }
 }
 

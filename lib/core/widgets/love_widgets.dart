@@ -1,6 +1,8 @@
 import 'dart:math' as math;
 
+import 'package:flutter/foundation.dart';
 import 'package:flutter/material.dart';
+import 'package:flutter/scheduler.dart';
 
 import '../theme/app_colors.dart';
 
@@ -31,23 +33,29 @@ class FloatingHearts extends StatefulWidget {
 }
 
 class _FloatingHeartsState extends State<FloatingHearts> with SingleTickerProviderStateMixin {
-  late final AnimationController _c = AnimationController(vsync: this, duration: const Duration(seconds: 18))..repeat();
+  // Continuous time (in 18 s cycles) rather than a repeating 0→1 controller,
+  // so hearts with different speeds never jump when the cycle wraps.
+  final _time = ValueNotifier<double>(0);
+  late final Ticker _ticker = createTicker((elapsed) => _time.value = elapsed.inMicroseconds / 18e6)..start();
   late final List<_Heart> _hearts = List.generate(widget.count, (i) => _Heart(math.Random(i * 97 + 13)));
 
   @override
   void dispose() {
-    _c.dispose();
+    _ticker.dispose();
+    _time.dispose();
     super.dispose();
   }
 
   @override
   Widget build(BuildContext context) {
-    final reduceMotion = MediaQuery.maybeDisableAnimationsOf(context) ?? false;
-    if (reduceMotion) _c.stop();
+    _ticker.muted = MediaQuery.maybeDisableAnimationsOf(context) ?? false;
     return ExcludeSemantics(
       child: IgnorePointer(
         child: RepaintBoundary(
-          child: CustomPaint(size: Size.infinite, painter: _HeartsPainter(_c, _hearts, widget.color, widget.opacity)),
+          child: CustomPaint(
+            size: Size.infinite,
+            painter: _HeartsPainter(_time, _hearts, widget.color, widget.opacity),
+          ),
         ),
       ),
     );
@@ -65,8 +73,8 @@ class _Heart {
 }
 
 class _HeartsPainter extends CustomPainter {
-  _HeartsPainter(this.anim, this.hearts, this.color, this.opacity) : super(repaint: anim);
-  final Animation<double> anim;
+  _HeartsPainter(this.time, this.hearts, this.color, this.opacity) : super(repaint: time);
+  final ValueListenable<double> time;
   final List<_Heart> hearts;
   final Color color;
   final double opacity;
@@ -74,7 +82,7 @@ class _HeartsPainter extends CustomPainter {
   @override
   void paint(Canvas canvas, Size size) {
     for (final h in hearts) {
-      final t = (anim.value * h.speed + h.phase) % 1.0;
+      final t = (time.value * h.speed + h.phase) % 1.0;
       final y = size.height * (1.1 - t * 1.25);
       final x = size.width * h.x + math.sin((t + h.phase) * math.pi * 2) * h.sway;
       final fade = t < 0.15 ? t / 0.15 : (t > 0.85 ? (1 - t) / 0.15 : 1.0);
@@ -119,9 +127,14 @@ class Wordmark extends StatelessWidget {
   Widget build(BuildContext context) {
     return ShaderMask(
       shaderCallback: (rect) => AppColors.brandGradient.createShader(rect),
-      child: Text(
-        text,
-        style: TextStyle(fontFamily: AppFonts.script, fontSize: size, color: Colors.white, height: 1.25),
+      // The script font's descenders (the "p") hang below the line box; the
+      // padding makes the mask cover them so they aren't drawn plain white.
+      child: Padding(
+        padding: EdgeInsets.only(bottom: size * 0.2),
+        child: Text(
+          text,
+          style: TextStyle(fontFamily: AppFonts.script, fontSize: size, color: Colors.white, height: 1.25),
+        ),
       ),
     );
   }

@@ -1,24 +1,37 @@
 import 'package:flutter/material.dart';
+import 'package:flutter_riverpod/flutter_riverpod.dart';
 
 import '../../../core/i18n/countries.dart';
+import '../../../core/supabase/supabase_providers.dart';
 import '../../../core/i18n/units.dart';
 import '../../../core/theme/app_colors.dart';
 import '../../../core/widgets/profile_photo.dart';
 import '../../profile/domain/profile_models.dart';
 
 /// Full-bleed photo card with tap-to-browse photos and key details.
-class ProfileCardView extends StatefulWidget {
+class ProfileCardView extends ConsumerStatefulWidget {
   const ProfileCardView({super.key, required this.card, this.onInfo});
 
   final ProfileCard card;
   final VoidCallback? onInfo;
 
   @override
-  State<ProfileCardView> createState() => _ProfileCardViewState();
+  ConsumerState<ProfileCardView> createState() => _ProfileCardViewState();
 }
 
-class _ProfileCardViewState extends State<ProfileCardView> {
+class _ProfileCardViewState extends ConsumerState<ProfileCardView> {
+  static const _photoWidth = 1080;
   int _photo = 0;
+  bool _precached = false;
+
+  @override
+  void didChangeDependencies() {
+    super.didChangeDependencies();
+    // Load every photo up front so tapping through them never flashes.
+    if (_precached || widget.card.photos.isEmpty) return;
+    _precached = true;
+    precacheProfilePhotos(context, ref.read(photoUrlResolverProvider), widget.card.photos, memCacheWidth: _photoWidth);
+  }
 
   void _tap(TapUpDetails details, double width) {
     final count = widget.card.photos.length;
@@ -52,7 +65,7 @@ class _ProfileCardViewState extends State<ProfileCardView> {
                 ProfilePhoto(
                   key: ValueKey(photos.isEmpty ? null : photos[_photo]),
                   storagePath: photos.isEmpty ? null : photos[_photo],
-                  memCacheWidth: 1080,
+                  memCacheWidth: _photoWidth,
                 ),
                 const DecoratedBox(decoration: BoxDecoration(gradient: AppColors.photoScrim)),
                 if (photos.length > 1)
@@ -120,6 +133,10 @@ class _ProfileCardViewState extends State<ProfileCardView> {
                               spacing: 6,
                               runSpacing: 6,
                               children: [
+                                if (card.isRepeat)
+                                  const _Pill(text: '👀 Second look')
+                                else if (card.isRandom)
+                                  const _Pill(text: '✨ Random pick'),
                                 _Pill(text: '${card.intention.emoji} ${card.intention.label}'),
                                 if (card.distanceKm != null)
                                   _Pill(icon: Icons.near_me_rounded, text: DistanceUnits.away(card.distanceKm!)),

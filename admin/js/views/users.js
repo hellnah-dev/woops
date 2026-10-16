@@ -49,7 +49,7 @@ async function renderUser(view, id, rerender) {
   view.innerHTML = `
     <div class="page-head">
       <div><a href="#/users" class="muted small">← Users</a>
-        <h1>${esc(p.display_name)}, ${esc(p.age)} ${p.is_verified ? '✅' : ''}</h1>
+        <h1>${esc(p.display_name)}, ${esc(p.age)} ${p.is_verified ? '✅' : ''} ${p.age_verified ? '🪪' : ''}</h1>
         <p class="muted">${p.username ? '@' + esc(p.username) + ' · ' : ''}${esc(p.email)} · ${pill(p.status)}</p></div>
       <span class="spacer"></span>
       <div class="toolbar">
@@ -57,12 +57,13 @@ async function renderUser(view, id, rerender) {
         ${p.status !== 'suspended' ? '<button class="btn warn" data-status="suspended">Suspend</button>' : ''}
         ${p.status !== 'banned' ? '<button class="btn danger" data-status="banned">Ban</button>' : ''}
         <button class="btn" id="verify">${p.is_verified ? 'Remove verification' : 'Mark verified'}</button>
+        ${p.age_verified ? '<button class="btn warn" id="reset-age">Reset age check</button>' : ''}
       </div>
     </div>
     <div class="grid two-col">
       <div class="card"><h2>Photos</h2>
         <div class="photo-grid">${d.photos.map((ph) => `
-          <div class="photo-tile"><img alt="" src="${esc(urls[ph.storage_path] ?? '')}">
+          <div class="photo-tile"><img alt="" data-zoom="Photo ${esc(ph.position + 1)}" src="${esc(urls[ph.storage_path] ?? '')}">
             <div class="meta">#${esc(ph.position + 1)}<button class="btn small danger" data-photo="${esc(ph.id)}">Remove</button></div></div>`).join('') ||
           '<p class="muted">No photos.</p>'}</div>
         <h2 style="margin-top:16px">Profile</h2>
@@ -83,6 +84,13 @@ async function renderUser(view, id, rerender) {
         </dl>
       </div>
       <div class="grid" style="align-content:start">
+        ${readinessCard({ ...d.readiness, id_pending: (d.age_checks ?? []).some((v) => v.status === 'pending') }, p)}
+        <div class="card"><h2>ID age checks</h2>
+          ${(d.age_checks ?? []).map((v) => `<div style="margin-bottom:8px">${pill(v.status)} ${esc(v.document_type)}
+            ${flag(v.country_code)} <span class="muted small">${esc(fmtDate(v.created_at))}</span>
+            ${v.reject_reason ? `<div class="small">${esc(v.reject_reason)}</div>` : ''}</div>`).join('') ||
+            '<p class="muted">No ID sent yet.</p>'}
+          <p class="muted small">Documents are deleted after review; only the result is kept.</p></div>
         <div class="card"><h2>Activity</h2><dl class="kv">
           ${Object.entries(d.counts).map(([k, v]) => kv(k.replaceAll('_', ' '), esc(v))).join('')}
           ${kv('reports made', esc(d.reports_made))}</dl></div>
@@ -113,10 +121,34 @@ async function renderUser(view, id, rerender) {
     catch (e) { toast(e.message, { type: 'error' }); }
   };
   view.querySelectorAll('[data-photo]').forEach((b) => b.addEventListener('click', () => removePhoto(b.dataset.photo, rerender)));
+  const reset = view.querySelector('#reset-age');
+  if (reset) reset.onclick = async () => {
+    const reason = await ask({ title: `Reset ${p.display_name}'s age check?`, input: true, danger: true, confirmLabel: 'Reset',
+      message: 'They will need to send an ID again before they can like or pass.', placeholder: 'Reason (saved in the audit log)' });
+    if (reason === null) return;
+    try { await rpc('admin_reset_age_check', { p_user: id, p_reason: reason || null }); toast('Age check reset', { type: 'ok' }); rerender(); }
+    catch (e) { toast(e.message, { type: 'error' }); }
+  };
+}
+
+// "Ready to date" checklist: the same rules the server enforces before swiping.
+function readinessCard(r, p) {
+  if (!r) return '';
+  const row = (ok, label) => `<div class="small">${ok ? '✅' : '❌'} ${esc(label)}</div>`;
+  return `<div class="card"><h2>Ready to match: ${r.ready ? 'yes' : 'no'}</h2>
+    ${row(r.photos >= 2, `Photos: ${r.photos} (needs 2+)`)}
+    ${row(r.has_bio, 'Bio written')}
+    ${row(r.interests >= 3, `Interests: ${r.interests} (needs 3+)`)}
+    ${row(p.age_verified || r.id_pending, p.age_verified ? 'Age confirmed by ID' : r.id_pending ? 'ID sent, waiting for review' : 'No ID sent')}
+    <p class="muted small">Minimum age in ${esc(p.country_code ?? 'their country')}: ${esc(r.min_age)} · their age: ${esc(p.age)}</p></div>`;
 }
 
 export async function removePhoto(photoId, rerender) {
-  const reason = await ask({ title: 'Remove this photo?', input: true, danger: true, confirmLabel: 'Remove', placeholder: 'Reason (optional)' });
+  const reason = await ask({ title: 'Remove this photo?', input: true, danger: true, confirmLabel: 'Remove', required: true,
+    message: 'The reason is sent to the user so they know what to change.',
+    placeholder: 'Reason shown to the user',
+    choices: ['Nudity or sexual content', 'Not a photo of you', 'Face not visible', 'Contains contact details or ads',
+      'Violence or hateful content', 'Photo of a child', 'Low quality or heavily filtered'] });
   if (reason === null) return;
   try {
     const path = await rpc('admin_delete_photo', { p_photo: photoId, p_reason: reason || null });

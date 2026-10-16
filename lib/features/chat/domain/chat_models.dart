@@ -21,6 +21,8 @@ class ChatMessage {
     this.body,
     this.mediaPath,
     this.delivery = DeliveryState.sent,
+    this.encrypted = false,
+    this.localPath,
   });
 
   /// Server id. For optimistic messages this equals [clientId] until the server responds.
@@ -34,6 +36,12 @@ class ChatMessage {
   final DateTime createdAt;
   final DeliveryState delivery;
 
+  /// Sent end-to-end encrypted (the server only saw ciphertext).
+  final bool encrypted;
+
+  /// Photo saved on this phone (chat photos never stay on the server).
+  final String? localPath;
+
   factory ChatMessage.fromJson(Map<String, dynamic> json) => ChatMessage(
     id: json['id'] as String,
     conversationId: json['conversation_id'] as String,
@@ -43,18 +51,48 @@ class ChatMessage {
     body: json['body'] as String?,
     mediaPath: json['media_path'] as String?,
     createdAt: DateTime.parse(json['created_at'] as String),
+    encrypted: (json['metadata'] as Map?)?['e2e'] == true || json['encrypted'] == true,
+    localPath: json['local_path'] as String?,
   );
 
-  ChatMessage copyWith({DeliveryState? delivery}) => ChatMessage(
+  /// Saved on the phone. A message still "sending" when the app closed is
+  /// restored as "failed" so it can be retried.
+  factory ChatMessage.fromLocalJson(Map<String, dynamic> json) {
+    final delivery = DeliveryState.values.firstWhere(
+      (d) => d.name == json['delivery'],
+      orElse: () => DeliveryState.sent,
+    );
+    return ChatMessage.fromJson(
+      json,
+    ).copyWith(delivery: delivery == DeliveryState.sending ? DeliveryState.failed : delivery);
+  }
+
+  Map<String, dynamic> toLocalJson() => {
+    'id': id,
+    'conversation_id': conversationId,
+    'sender_id': senderId,
+    'client_id': clientId,
+    'kind': kind.name,
+    'body': body,
+    'media_path': mediaPath,
+    'created_at': createdAt.toUtc().toIso8601String(),
+    'delivery': delivery.name,
+    'encrypted': encrypted,
+    'local_path': localPath,
+  };
+
+  ChatMessage copyWith({DeliveryState? delivery, String? body, String? localPath, bool? encrypted}) => ChatMessage(
     id: id,
     conversationId: conversationId,
     senderId: senderId,
     clientId: clientId,
     kind: kind,
-    body: body,
+    body: body ?? this.body,
     mediaPath: mediaPath,
     createdAt: createdAt,
     delivery: delivery ?? this.delivery,
+    encrypted: encrypted ?? this.encrypted,
+    localPath: localPath ?? this.localPath,
   );
 }
 
@@ -107,6 +145,21 @@ class ConversationSummary {
   final int unreadCount;
 
   bool get hasMessages => lastMessageAt != null;
+
+  /// Fills in the last message and unread count from the phone's own storage.
+  ConversationSummary withLocal({ChatMessage? last, required int unread}) => ConversationSummary(
+    matchId: matchId,
+    conversationId: conversationId,
+    matchedAt: matchedAt,
+    otherUserId: otherUserId,
+    otherDisplayName: otherDisplayName,
+    otherPhoto: otherPhoto,
+    lastMessageBody: last?.body,
+    lastMessageKind: last?.kind,
+    lastMessageSenderId: last?.senderId,
+    lastMessageAt: last?.createdAt ?? lastMessageAt,
+    unreadCount: unread,
+  );
   DateTime get sortTime => lastMessageAt ?? matchedAt;
 
   String previewFor(String myUserId) {
@@ -114,6 +167,7 @@ class ConversationSummary {
     return switch (lastMessageKind) {
       MessageKind.image => '${prefix}Sent a photo',
       MessageKind.system => lastMessageBody ?? '',
+      null => 'Tap to keep chatting',
       _ => '$prefix${lastMessageBody ?? ''}',
     };
   }

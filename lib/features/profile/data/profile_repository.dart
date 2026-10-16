@@ -4,6 +4,7 @@ import 'package:intl/intl.dart';
 import 'package:supabase_flutter/supabase_flutter.dart';
 
 import '../../../core/supabase/supabase_providers.dart';
+import '../../../core/utils/app_exception.dart';
 import '../../../core/utils/image_processing.dart';
 import '../domain/profile_models.dart';
 
@@ -26,7 +27,9 @@ class ProfileRepository {
         .from('profiles')
         .select(
           '*, profile_photos(id, storage_path, position), profile_interests(interest_id), '
-          'profile_prompts(id, prompt, answer, position)',
+          'profile_prompts(id, prompt, answer, position), '
+          'age_verifications(status, reject_reason, created_at), '
+          'verification_requests(status, reject_reason, created_at)',
         )
         .eq('id', _uid)
         .maybeSingle();
@@ -78,6 +81,16 @@ class ProfileRepository {
   Future<void> uploadPhoto(XFile file, {required int position}) async {
     final uid = _uid;
     final processed = await _images.processProfilePhoto(await file.readAsBytes());
+    // 5 MB of media per person in total (profile photos + chat photos on the server).
+    final usage = await mediaUsage();
+    final adding = processed.full.lengthInBytes + (processed.thumbnail?.lengthInBytes ?? 0);
+    if (usage.used + adding > usage.limit) {
+      throw AppException(
+        'You’ve used ${formatMb(usage.used)} of your ${formatMb(usage.limit)} media space. '
+        'Remove a photo to add a new one.',
+        code: 'media_quota',
+      );
+    }
     final path = '$uid/${DateTime.now().microsecondsSinceEpoch}.${processed.format.extension}';
     final bucket = _client.storage.from(photoBucket);
     final options = FileOptions(contentType: processed.format.contentType, upsert: false);
@@ -99,6 +112,18 @@ class ProfileRepository {
     }
   }
 
+  /// Bytes of my media on the server and the 5 MB allowance.
+  Future<({int used, int limit})> mediaUsage() async {
+    try {
+      final j = Map<String, dynamic>.from(await _client.rpc('get_my_media_usage') as Map);
+      return (used: (j['used_bytes'] as num).toInt(), limit: (j['limit_bytes'] as num).toInt());
+    } on PostgrestException catch (e) {
+      // Database not updated yet: don't block uploads (storage still caps each file).
+      if (e.code == 'PGRST202') return (used: 0, limit: 5 * 1024 * 1024);
+      rethrow;
+    }
+  }
+
   /// Uploads a verification selfie (only admins can view it) and opens a request.
   Future<void> requestVerification(XFile selfie) async {
     final uid = _uid;
@@ -108,6 +133,24 @@ class ProfileRepository {
         .from('verification-selfies')
         .uploadBinary(path, bytes, fileOptions: const FileOptions(contentType: 'image/jpeg', upsert: false));
     await _client.rpc('request_verification', params: {'p_selfie_path': path});
+  }
+
+  /// Uploads a photo of an ID document (only admins can view it, and it is
+  /// deleted after review) and asks for an age check.
+  Future<void> submitAgeDocument(XFile document, {required String documentType}) async {
+    final uid = _uid;
+    final original = await document.readAsBytes();
+    ImageProcessor.checkUploadSize(original.lengthInBytes);
+    final bytes = await _images.processDocument(original);
+    final path = '$uid/${DateTime.now().microsecondsSinceEpoch}.jpg';
+    final bucket = _client.storage.from('id-documents');
+    await bucket.uploadBinary(path, bytes, fileOptions: const FileOptions(contentType: 'image/jpeg', upsert: false));
+    await _client.rpc('submit_age_verification', params: {'p_document_type': documentType, 'p_document_path': path});
+  }
+
+  Future<int> minAgeForCountry(String? countryCode) async {
+    if (countryCode == null) return 18;
+    return (await _client.rpc('min_age_for_country', params: {'p_country': countryCode}) as num).toInt();
   }
 
   /// Latest verification request status: null, 'pending', 'approved' or 'rejected'.

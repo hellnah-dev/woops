@@ -109,6 +109,26 @@ void main() {
     expect(find.text('Bina  27', findRichText: true), findsWidgets);
   });
 
+  testWidgets('Discover labels random picks shown when few people match the filters', (tester) async {
+    final repo = FakeDiscoveryRepository([
+      [card('a', name: 'Asha'), card('r', name: 'Riya', random: true)],
+    ]);
+    await tester.pumpWidget(
+      _app(
+        const DiscoverScreen(),
+        overrides: [discoveryRepositoryProvider.overrideWithValue(repo), currentUserIdProvider.overrideWithValue('me')],
+      ),
+    );
+    await tester.pumpAndSettle();
+    // Only Riya's card (drawn underneath the top one) carries the label.
+    expect(find.text('✨ Random pick'), findsOneWidget);
+    await tester.tap(find.byTooltip('Like'));
+    await tester.pumpAndSettle();
+    expect(find.text('Riya  27', findRichText: true), findsWidgets);
+    expect(find.text('✨ Random pick'), findsOneWidget);
+    expect(repo.swipes, [('a', SwipeAction.like)]);
+  });
+
   testWidgets('Discover shows a helpful empty state', (tester) async {
     final repo = FakeDiscoveryRepository([const []]);
     await tester.pumpWidget(

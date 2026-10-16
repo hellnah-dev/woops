@@ -3,7 +3,7 @@ import 'package:flutter_riverpod/flutter_riverpod.dart';
 import 'package:go_router/go_router.dart';
 import 'package:url_launcher/url_launcher.dart';
 
-import '../../../core/config/env.dart';
+import '../../../core/config/app_info.dart';
 import '../../../core/permissions/permission_gate.dart';
 import '../../../core/router/app_router.dart';
 import '../../../core/supabase/supabase_providers.dart';
@@ -12,6 +12,7 @@ import '../../../core/widgets/state_views.dart';
 import '../../../core/widgets/confirm_dialog.dart';
 import '../../ads/ads_service.dart';
 import '../../auth/data/auth_repository.dart';
+import '../../chat/data/local_chat_store.dart';
 import '../../discovery/application/discovery_controller.dart';
 import '../../discovery/presentation/filters_sheet.dart';
 import '../../legal/legal_screen.dart';
@@ -141,8 +142,9 @@ class SettingsScreen extends ConsumerWidget {
           ListTile(
             leading: const Icon(Icons.help_outline_rounded),
             title: const Text('Help & support'),
-            subtitle: const Text(Env.supportEmail),
-            onTap: () => _open(context, 'mailto:${Env.supportEmail}?subject=Woops%20support'),
+            subtitle: const Text('kamaucha.me/rammy24d'),
+            trailing: const Icon(Icons.open_in_new_rounded, size: 18),
+            onTap: () => _open(context, AppInfo.supportUrl),
           ),
           ListTile(
             leading: const Icon(Icons.info_outline_rounded),
@@ -203,7 +205,9 @@ class _DeleteAccountDialogState extends ConsumerState<_DeleteAccountDialog> {
     setState(() => _deleting = true);
     try {
       await ref.read(pushServiceProvider).unregister();
+      final chats = ref.read(localChatStoreProvider);
       await ref.read(settingsRepositoryProvider).deleteAccount();
+      await chats.wipe();
       if (mounted) Navigator.pop(context);
     } catch (e) {
       if (mounted) {
@@ -272,6 +276,7 @@ class NotificationSettingsScreen extends ConsumerWidget {
         error: (e, _) => ErrorView(error: e, onRetry: () => ref.invalidate(notificationPreferencesProvider)),
         data: (p) => ListView(
           children: [
+            const _PhoneNotificationsTile(),
             if (!PushService.isEnabled)
               const ListTile(
                 leading: Icon(Icons.info_outline_rounded),
@@ -333,7 +338,8 @@ class PrivacySettingsScreen extends ConsumerWidget {
                       context,
                       icon: Icons.pause_circle_outline_rounded,
                       title: 'Pause your profile?',
-                      message: 'New people won’t see you in Discover until you turn this back on. '
+                      message:
+                          'New people won’t see you in Discover until you turn this back on. '
                           'Your matches and chats stay as they are.',
                       confirmLabel: 'Pause',
                     )) {
@@ -396,7 +402,8 @@ class BlockedUsersScreen extends ConsumerWidget {
                           final ok = await confirmAction(
                             context,
                             title: 'Unblock ${u.displayName}?',
-                            message: 'You may see each other in Discover again. Any previous match '
+                            message:
+                                'You may see each other in Discover again. Any previous match '
                                 'and conversation won’t come back.',
                             confirmLabel: 'Unblock',
                           );
@@ -413,6 +420,36 @@ class BlockedUsersScreen extends ConsumerWidget {
                     ),
                 ],
               ),
+      ),
+    );
+  }
+}
+
+final _notificationsAllowedProvider = FutureProvider.autoDispose<bool>(
+  (ref) => ref.watch(pushServiceProvider).isAllowed,
+);
+
+/// Lets people turn on notifications later if they skipped the prompt.
+class _PhoneNotificationsTile extends ConsumerWidget {
+  const _PhoneNotificationsTile();
+
+  @override
+  Widget build(BuildContext context, WidgetRef ref) {
+    final allowed = ref.watch(_notificationsAllowedProvider).valueOrNull ?? true;
+    if (allowed) return const SizedBox.shrink();
+    return ListTile(
+      leading: const Icon(Icons.notifications_off_outlined),
+      title: const Text('Notifications are off on this phone'),
+      subtitle: const Text('Turn them on to hear about matches and messages.'),
+      trailing: FilledButton.tonal(
+        style: FilledButton.styleFrom(minimumSize: const Size(80, 40)),
+        onPressed: () async {
+          if (await PermissionGate.request(context, AppPermission.notifications)) {
+            await ref.read(pushServiceProvider).registerForCurrentUser();
+          }
+          ref.invalidate(_notificationsAllowedProvider);
+        },
+        child: const Text('Turn on'),
       ),
     );
   }

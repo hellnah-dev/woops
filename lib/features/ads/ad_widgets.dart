@@ -1,7 +1,10 @@
+import 'dart:async';
+
 import 'package:flutter/material.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
 import 'package:google_mobile_ads/google_mobile_ads.dart';
 
+import 'ad_pacer.dart';
 import 'ads_config.dart';
 import 'ads_service.dart';
 
@@ -116,9 +119,13 @@ class _NativeAdCardState extends ConsumerState<NativeAdCard> {
   NativeAd? _ad;
   bool _loaded = false;
 
+  /// Decided once per card: only load if the pacing allows an ad right now.
+  bool? _allowed;
+
   void _load(BuildContext context) {
     final unit = AdsConfig.nativeUnitId;
-    if (_ad != null || unit == null) return;
+    _allowed ??= ref.read(adPacerProvider.notifier).canShow;
+    if (_ad != null || unit == null || _allowed != true) return;
     final dark = Theme.of(context).brightness == Brightness.dark;
     _ad = NativeAd(
       adUnitId: unit,
@@ -131,6 +138,7 @@ class _NativeAdCardState extends ConsumerState<NativeAdCard> {
       listener: NativeAdListener(
         onAdLoaded: (_) => mounted ? setState(() => _loaded = true) : null,
         onAdFailedToLoad: (ad, _) => ad.dispose(),
+        onAdImpression: (_) => ref.read(adPacerProvider.notifier).recordImpression(),
       ),
     )..load();
   }
@@ -156,6 +164,73 @@ class _NativeAdCardState extends ConsumerState<NativeAdCard> {
           ConstrainedBox(
             constraints: const BoxConstraints(minHeight: 90, maxHeight: 120),
             child: AdWidget(ad: _ad!),
+          ),
+        ],
+      ),
+    );
+  }
+}
+
+/// Loads a native ad for the Discover deck (medium template). Completes with
+/// null if ads are off, not allowed right now, or the ad fails to load.
+Future<NativeAd?> loadDeckAd({required bool dark, required VoidCallback onImpression}) {
+  final unit = AdsConfig.nativeUnitId;
+  if (!AdsConfig.deckEnabled || unit == null) return Future.value(null);
+  final done = Completer<NativeAd?>();
+  NativeAd(
+    adUnitId: unit,
+    request: const AdRequest(),
+    nativeTemplateStyle: NativeTemplateStyle(
+      templateType: TemplateType.medium,
+      mainBackgroundColor: dark ? const Color(0xFF1C1820) : Colors.white,
+      cornerRadius: 16,
+    ),
+    listener: NativeAdListener(
+      onAdLoaded: (ad) => done.isCompleted ? null : done.complete(ad as NativeAd),
+      onAdFailedToLoad: (ad, _) {
+        ad.dispose();
+        if (!done.isCompleted) done.complete(null);
+      },
+      onAdImpression: (_) => onImpression(),
+    ),
+  ).load();
+  return done.future.timeout(const Duration(seconds: 20), onTimeout: () => null);
+}
+
+/// A clearly labelled sponsored card shown between profiles. It is dismissed
+/// with a button, not by swiping, so swipes never turn into accidental ad clicks.
+class DeckAdCard extends StatelessWidget {
+  const DeckAdCard({super.key, required this.ad, required this.onContinue});
+  final NativeAd ad;
+  final VoidCallback onContinue;
+
+  @override
+  Widget build(BuildContext context) {
+    return Card(
+      clipBehavior: Clip.antiAlias,
+      child: Column(
+        crossAxisAlignment: CrossAxisAlignment.stretch,
+        children: [
+          const Padding(padding: EdgeInsets.only(top: 8), child: _SponsoredLabel()),
+          Expanded(
+            child: Padding(
+              padding: const EdgeInsets.symmetric(horizontal: 12),
+              child: Center(
+                child: ConstrainedBox(
+                  constraints: const BoxConstraints(minHeight: 320, maxHeight: 420),
+                  child: AdWidget(ad: ad),
+                ),
+              ),
+            ),
+          ),
+          Padding(
+            padding: const EdgeInsets.fromLTRB(16, 8, 16, 16),
+            child: FilledButton.tonalIcon(
+              key: const Key('deck-ad-continue'),
+              onPressed: onContinue,
+              icon: const Icon(Icons.arrow_forward_rounded),
+              label: const Text('Continue to profiles'),
+            ),
           ),
         ],
       ),

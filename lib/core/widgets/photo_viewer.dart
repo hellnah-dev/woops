@@ -155,7 +155,13 @@ class _ZoomablePhotoState extends State<_ZoomablePhoto> with SingleTickerProvide
         maxScale: 5,
         onInteractionEnd: (_) => widget.onZoomChanged(_transform.value.getMaxScaleOnAxis() > 1.01),
         child: Center(
-          child: ProfilePhoto(storagePath: widget.path, fit: BoxFit.contain),
+          // The 1080 px copy is usually cached already (cards, profile page),
+          // so it shows at once while the full-size photo loads.
+          child: ProfilePhoto(
+            storagePath: widget.path,
+            fit: BoxFit.contain,
+            placeholder: ProfilePhoto(storagePath: widget.path, fit: BoxFit.contain, memCacheWidth: 1080),
+          ),
         ),
       ),
     );

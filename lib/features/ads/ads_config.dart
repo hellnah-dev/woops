@@ -16,6 +16,15 @@ class AdsConfig {
   static const nativeEnabled = bool.fromEnvironment('ADS_NATIVE', defaultValue: true);
   static const rewardedEnabled = bool.fromEnvironment('ADS_REWARDED', defaultValue: true);
 
+  /// "Sponsored" card shown between profiles in Discover (paced, see AdPacing).
+  static const deckEnabled = bool.fromEnvironment('ADS_DECK', defaultValue: true);
+
+  /// Pacing: ads start at 1 per 5 minutes and rise to [maxPer5Min] by day
+  /// [rampDays]. No passive ads in the first [sessionGraceSeconds] of a session.
+  static const maxPer5Min = int.fromEnvironment('ADS_MAX_PER_5MIN', defaultValue: 5);
+  static const rampDays = int.fromEnvironment('ADS_RAMP_DAYS', defaultValue: 7);
+  static const sessionGraceSeconds = int.fromEnvironment('ADS_GRACE_SECONDS', defaultValue: 60);
+
   /// Extra likes per rewarded ad, for display only; the server decides the real
   /// amount (REWARD_LIKES secret) and the daily cap.
   static const rewardLikes = int.fromEnvironment('ADS_REWARD_LIKES', defaultValue: 10);

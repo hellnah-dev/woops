@@ -9,8 +9,9 @@ import * as photos from './views/photos.js';
 import * as reports from './views/reports.js';
 import * as users from './views/users.js';
 import * as verifications from './views/verifications.js';
+import * as ageChecks from './views/ageChecks.js';
 
-const routes = { dashboard, reports, verifications, users, photos, errors, 'age-rules': ageRules, audit };
+const routes = { dashboard, reports, verifications, 'age-checks': ageChecks, users, photos, errors, 'age-rules': ageRules, audit };
 
 let config;
 try {

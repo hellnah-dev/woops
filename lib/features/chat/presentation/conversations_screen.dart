@@ -2,6 +2,7 @@ import 'package:flutter/material.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
 import 'package:go_router/go_router.dart';
 
+import '../../ads/ad_widgets.dart';
 import '../../../core/router/app_router.dart';
 import '../../../core/supabase/supabase_providers.dart';
 import '../../../core/theme/app_colors.dart';
@@ -80,7 +81,15 @@ class ConversationsScreen extends ConsumerWidget {
                     ),
                   )
                 else
-                  for (final c in chats) _ConversationTile(summary: c, myId: myId),
+                  for (final (i, c) in chats.indexed) ...[
+                    _ConversationTile(summary: c, myId: myId),
+                    // One paced "Sponsored" card after the third chat, never between more.
+                    if (i == 2)
+                      const Padding(
+                        padding: EdgeInsets.symmetric(horizontal: AppSpacing.md, vertical: AppSpacing.sm),
+                        child: NativeAdCard(),
+                      ),
+                  ],
               ],
             ),
           );

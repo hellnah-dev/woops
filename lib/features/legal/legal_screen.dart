@@ -26,7 +26,12 @@ enum LegalDoc {
   String get route => '/legal/$slug';
 }
 
-void openLegal(BuildContext context, LegalDoc doc) => context.push(doc.route);
+void openLegal(BuildContext context, LegalDoc doc) {
+  // Drop focus first, otherwise coming back re-focuses the last text field
+  // and the keyboard pops up unasked.
+  FocusManager.instance.primaryFocus?.unfocus();
+  context.push(doc.route);
+}
 
 class LegalScreen extends StatelessWidget {
   const LegalScreen({super.key, required this.doc});

@@ -40,6 +40,19 @@ class ImageProcessor {
   static const maxFullBytes = 350 * 1024;
   static const qualityLadder = [80, 70, 60, 50];
 
+  /// Largest single file (ID documents); media also has a 5 MB total per person.
+  static const maxUploadBytes = 5 * 1024 * 1024;
+
+  /// Rejects files over 5 MB before any work is done.
+  static void checkUploadSize(int bytes) {
+    if (bytes > maxUploadBytes) {
+      throw AppException(
+        'This photo is ${(bytes / (1024 * 1024)).toStringAsFixed(1)} MB. Please choose one that is 5 MB or smaller.',
+        code: 'photo_too_large',
+      );
+    }
+  }
+
   final ImageEncoder _encode;
   final bool isWeb;
 
@@ -81,6 +94,16 @@ class ImageProcessor {
     );
   }
 
+  /// ID documents keep more detail so the date of birth stays readable.
+  Future<Uint8List> processDocument(Uint8List input) async {
+    if (isWeb) return input;
+    try {
+      return await _encode(input, size: 1600, quality: 85, format: ImageFormat.jpeg);
+    } catch (_) {
+      throw const AppException('We couldn’t process that photo. Please try again.', code: 'unsupported_image');
+    }
+  }
+
   Future<Uint8List> processSelfie(Uint8List input) async {
     if (isWeb) return input;
     try {
@@ -98,3 +121,6 @@ String thumbnailPathFor(String path) {
   if (dot <= slash) return '${path}_thumb';
   return '${path.substring(0, dot)}_thumb${path.substring(dot)}';
 }
+
+/// 1536000 → "1.5 MB".
+String formatMb(int bytes) => '${(bytes / (1024 * 1024)).toStringAsFixed(1)} MB';

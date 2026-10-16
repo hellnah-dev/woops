@@ -9,7 +9,7 @@ action is re-checked on the server against the `admins` table.
 ```bash
 cd admin
 ./make_config.sh                 # creates js/config.js from ../.env (URL + publishable key)
-python3 -m http.server 8081      # then open http://localhost:8081
+python3 serve.py                 # then open http://localhost:8081 (no caching)
 ```
 
 ## Become an admin

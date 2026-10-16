@@ -109,22 +109,45 @@ Then add Database Webhooks (Dashboard → Database → Webhooks) on **INSERT** i
 
 ## 6. Ads (Google AdMob)
 
-**Where ads appear:** a banner at the bottom of **Likes** and **Matches**, one labelled "Sponsored" native ad on **your own profile page**, and an optional **rewarded** ad offered only when you run out of likes (+10 likes, at most 3 times a day).
-**Never:** in chats, photos, the swipe deck, sign-in, onboarding, safety/report screens or settings. There are no interstitial (full-screen pop-up) ads.
+### How ads behave: minimal at first, slowly more
 
-Setup:
-1. Create an AdMob account. Add **two apps** (Android `com.woops.app`, iOS `com.woops.app`) and create **Banner**, **Native advanced** and **Rewarded** ad units for each.
-2. **App IDs** (required, or the app crashes on start):
-   - Android: add `ADMOB_APP_ID_ANDROID=ca-app-pub-xxx~yyy` to `android/gradle.properties`.
-   - iOS: edit `ios/Flutter/AdMob.xcconfig`.
-   - Both default to Google's **test** app IDs.
-3. **Ad unit IDs**: put them in `.env` (`ADMOB_*`). Debug builds always use Google's test ads, so you never accidentally see or click real ads (clicking your own ads breaks AdMob policy).
-4. **Consent**: in AdMob → Privacy & messaging, create a **GDPR message** and an **IDFA explainer** (iOS). The app shows these automatically where required, and users can change their choice in Settings → *Ad privacy choices*. Without consent, Google serves only non-personalised or limited ads.
-5. **Rewarded ad verification**: on the rewarded ad unit, enable *Server-side verification* with the callback URL `https://YOUR_REF.supabase.co/functions/v1/admob-ssv`. Extra likes are granted only after Google's signed callback; the app can't grant them itself.
-6. iOS: add Google's full `SKAdNetworkItems` list to `ios/Runner/Info.plist` (only Google's own ID is included).
-7. Switch placements on or off with `ADS_BANNERS`, `ADS_NATIVE`, `ADS_REWARDED` and `ADS_ENABLED`.
+| Ad | Where | How often |
+|---|---|---|
+| **Rewarded** | Offered only when someone runs out of likes ("watch an ad for +10 likes") | Only when the user chooses; never counted against the limit below; max 3 a day (server-checked) |
+| **Native "Sponsored" card** | In Discover between profiles, closed with a *Continue* button | Paced (below): about every 17 profiles for new users, at most every 5 profiles later |
+| **Native "Sponsored" card** | One in Likes, one after the 3rd chat in Chats, one on your Profile | Paced (below) |
+| Banner | Supported but off unless you place it | — |
 
-No revenue appears until AdMob approves your apps and real ads are serving in published builds.
+**Pacing** (`lib/features/ads/ad_pacer.dart`), per phone:
+- Day 1 (and 2): at most **1 ad per 5 minutes**. Day 3–4: 2. Day 5–6: 3. Day 7: 4. Day 8+: **5 ads per 5 minutes** (the maximum).
+- No ads in the **first minute** after opening the app.
+- Never in chats, photos, sign-in, onboarding, safety/report screens or settings. No full-screen interstitials and no app-open ads.
+- Tune without code changes in `.env`: `ADS_MAX_PER_5MIN`, `ADS_RAMP_DAYS`, `ADS_GRACE_SECONDS`, `ADS_DECK`, `ADS_NATIVE`, `ADS_REWARDED`, `ADS_ENABLED`.
+
+### Setup, step by step
+
+1. **AdMob account**: sign up at https://admob.google.com with the Google account that will receive payments, and add payment + tax details.
+2. **Add two apps** in AdMob → Apps → Add app: one **Android** and one **iOS** (choose "not published yet" if needed; link the store listings later).
+3. **Create 3 ad units per app** (6 total) in each app → Ad units → Add ad unit:
+   - **Rewarded**, name "Extra likes". Reward amount 10, item "likes". Turn on **Server-side verification** with callback URL `https://YOUR_REF.supabase.co/functions/v1/admob-ssv` (extra likes are only granted after Google's signed callback).
+   - **Native advanced**, name "Sponsored card".
+   - **Banner**, name "Banner" (optional, for later).
+4. **App IDs** (look like `ca-app-pub-1234…~5678…`; the app crashes on start without them):
+   - Android: add `ADMOB_APP_ID_ANDROID=ca-app-pub-…~…` to `android/gradle.properties`.
+   - iOS: put it in `ios/Flutter/AdMob.xcconfig` (`ADMOB_APP_ID_IOS=…`).
+5. **Ad unit IDs** (look like `ca-app-pub-1234…/9876…`) go in `.env`:
+   ```
+   ADMOB_ANDROID_REWARDED_ID=   ADMOB_IOS_REWARDED_ID=
+   ADMOB_ANDROID_NATIVE_ID=     ADMOB_IOS_NATIVE_ID=
+   ADMOB_ANDROID_BANNER_ID=     ADMOB_IOS_BANNER_ID=
+   ```
+   Debug builds **always** use Google's test ads, whatever you put here, so you can't accidentally click your own real ads (that gets accounts suspended). Only release builds show real ads.
+6. **Consent**: AdMob → Privacy & messaging → create a **GDPR message** (Europe/UK) and, for iOS, an **IDFA explainer** message. The app shows them automatically where required; users can change their choice in Settings → *Ad privacy choices*.
+7. **iOS only**: add Google's full `SKAdNetworkItems` list to `ios/Runner/Info.plist` (https://developers.google.com/admob/ios/privacy/skadnetwork).
+8. **app-ads.txt**: AdMob → Apps → app-ads.txt gives you a line to put at `https://<your developer website>/app-ads.txt` (the website listed in the store). Without it some advertisers won't bid.
+9. Build a release (`flutter build appbundle --release --dart-define-from-file=.env` / iOS archive) and publish. Real ads usually start within a few days of AdMob reviewing the app.
+
+**Testing**: run a debug build. Google's test ads appear (labelled "Test Ad"). To see the ramp quickly, temporarily set `ADS_RAMP_DAYS=1` and `ADS_GRACE_SECONDS=5` in `.env`.
 
 ## 7. Push notifications (optional)
 

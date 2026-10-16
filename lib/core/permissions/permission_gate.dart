@@ -42,12 +42,12 @@ class PermissionGate {
   const PermissionGate._();
 
   static Permission? _system(AppPermission p) => switch (p) {
-        AppPermission.camera => Permission.camera,
-        // Android 13+ uses the system Photo Picker, which needs no permission.
-        AppPermission.photos => Platform.isIOS ? Permission.photos : null,
-        AppPermission.location => Permission.locationWhenInUse,
-        AppPermission.notifications => Permission.notification,
-      };
+    AppPermission.camera => Permission.camera,
+    // Android 13+ uses the system Photo Picker, which needs no permission.
+    AppPermission.photos => Platform.isIOS ? Permission.photos : null,
+    AppPermission.location => Permission.locationWhenInUse,
+    AppPermission.notifications => Permission.notification,
+  };
 
   /// Returns true if the feature may be used now.
   static Future<bool> request(BuildContext context, AppPermission p) async {
@@ -89,8 +89,11 @@ class PermissionGate {
                 child: Icon(p.icon, color: Colors.white, size: 36),
               ),
               const SizedBox(height: AppSpacing.md),
-              Text(blocked ? '${p.title} in Settings' : p.title,
-                  style: theme.textTheme.titleLarge, textAlign: TextAlign.center),
+              Text(
+                blocked ? '${p.title} in Settings' : p.title,
+                style: theme.textTheme.titleLarge,
+                textAlign: TextAlign.center,
+              ),
               const SizedBox(height: AppSpacing.sm),
               Text(
                 blocked

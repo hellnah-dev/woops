@@ -128,7 +128,9 @@ class DiscoveryController extends Notifier<DiscoveryState> {
   }
 
   void _maybePrefetch() {
-    if (!state.exhausted && state.queue.length < prefetchThreshold) {
+    // When the last card goes, always ask again: the server brings back
+    // people you've already seen once no one new is left.
+    if (state.queue.isEmpty || (!state.exhausted && state.queue.length < prefetchThreshold)) {
       load();
     }
   }

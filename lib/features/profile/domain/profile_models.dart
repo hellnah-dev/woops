@@ -60,6 +60,8 @@ class ProfileCard {
     this.isVerified = false,
     this.username,
     this.zodiac,
+    this.isRandom = false,
+    this.isRepeat = false,
   });
 
   final String id;
@@ -81,6 +83,12 @@ class ProfileCard {
   final DateTime? likedAt;
   final String? countryCode;
   final bool isVerified;
+
+  /// Shown because too few people matched your filters (outside them).
+  final bool isRandom;
+
+  /// Someone you already liked or passed, shown again because no one new is left.
+  final bool isRepeat;
 
   String? get primaryPhoto => photos.isEmpty ? null : photos.first;
 
@@ -104,6 +112,8 @@ class ProfileCard {
     isVerified: json['is_verified'] as bool? ?? false,
     username: json['username'] as String?,
     zodiac: ZodiacSign.fromValue(json['zodiac'] as String?),
+    isRandom: json['is_random'] as bool? ?? false,
+    isRepeat: json['is_repeat'] as bool? ?? false,
   );
 }
 
@@ -119,6 +129,38 @@ class ProfilePhotoRecord {
     storagePath: json['storage_path'] as String,
     position: (json['position'] as num).toInt(),
   );
+}
+
+/// Status of the ID-document age check.
+enum AgeCheck { none, pending, approved, rejected }
+
+/// One thing a profile still needs before its owner can start matching.
+enum ProfileStep {
+  photos('Add at least 2 photos', 'People want to see who they are talking to.'),
+  bio('Write a short bio', 'A few lines about you start better conversations.'),
+  interests('Pick 3 or more interests', 'We use them to suggest people you will click with.'),
+  ageCheck('Confirm your age with an ID', 'Keeps Woops adults-only, following the rules in your country.');
+
+  const ProfileStep(this.title, this.why);
+  final String title;
+  final String why;
+}
+
+/// One line of the "complete your profile" checklist.
+class CompletionItem {
+  const CompletionItem(this.label, this.weight, this.progress);
+  final String label;
+
+  /// Share of the 100% (0..1).
+  final double weight;
+
+  /// How much of this item is done (0..1).
+  final double progress;
+
+  bool get done => progress >= 1;
+
+  /// Percentage points still to gain from this item.
+  int get remainingPercent => ((1 - progress) * weight * 100).round();
 }
 
 /// The signed-in user's own, full profile.
@@ -139,11 +181,21 @@ class MyProfile {
     this.countryCode,
     this.isVerified = false,
     this.username,
+    this.ageCheck = AgeCheck.none,
+    this.ageRejectReason,
+    this.selfieStatus,
+    this.selfieRejectReason,
   });
+
+  /// Latest selfie verification: null, 'pending', 'approved' or 'rejected'.
+  final String? selfieStatus;
+  final String? selfieRejectReason;
 
   final String id;
   final String displayName;
   final String? username;
+  final AgeCheck ageCheck;
+  final String? ageRejectReason;
   final DateTime birthdate;
   final Gender gender;
   final String bio;
@@ -161,17 +213,36 @@ class MyProfile {
 
   ZodiacSign get zodiac => ZodiacSign.fromBirthdate(birthdate);
 
+  /// What is still missing before liking and passing are allowed. The same
+  /// rules are enforced on the server (`private.profile_ready`).
+  List<ProfileStep> get missingSteps => [
+    if (photos.length < 2) ProfileStep.photos,
+    if (bio.trim().isEmpty) ProfileStep.bio,
+    if (interestIds.length < 3) ProfileStep.interests,
+    if (ageCheck != AgeCheck.approved && ageCheck != AgeCheck.pending) ProfileStep.ageCheck,
+  ];
+
+  bool get isReadyToDate => missingSteps.isEmpty;
+
+  /// Everything that counts towards 100%, with its share of the score.
+  List<CompletionItem> get completionItems => [
+    CompletionItem('Add 4 photos (${photos.length}/4)', 0.35, (photos.length.clamp(0, 4)) / 4),
+    CompletionItem('Write a bio', 0.15, bio.trim().isNotEmpty ? 1 : 0),
+    CompletionItem('Pick 3+ interests', 0.15, interestIds.length >= 3 ? 1 : 0),
+    CompletionItem(
+      'Confirm your age with an ID',
+      0.15,
+      ageCheck == AgeCheck.approved || ageCheck == AgeCheck.pending ? 1 : 0,
+    ),
+    CompletionItem('Answer a prompt', 0.1, prompts.isNotEmpty ? 1 : 0),
+    CompletionItem('Add your job', 0.05, (jobTitle ?? '').isNotEmpty ? 1 : 0),
+    CompletionItem('Add your city', 0.05, (city ?? '').isNotEmpty ? 1 : 0),
+  ];
+
   /// 0..1, used to nudge people to complete their profile.
-  double get completeness {
-    var score = 0.0;
-    score += (photos.length.clamp(0, 4)) / 4 * 0.4;
-    if (bio.trim().isNotEmpty) score += 0.2;
-    if (interestIds.length >= 3) score += 0.15;
-    if (prompts.isNotEmpty) score += 0.15;
-    if ((jobTitle ?? '').isNotEmpty) score += 0.05;
-    if ((city ?? '').isNotEmpty) score += 0.05;
-    return score.clamp(0, 1);
-  }
+  double get completeness => completionItems.fold(0.0, (sum, i) => sum + i.weight * i.progress).clamp(0, 1).toDouble();
+
+  int get completenessPercent => (completeness * 100).round();
 
   factory MyProfile.fromJson(Map<String, dynamic> json) {
     final photos =
@@ -184,7 +255,25 @@ class MyProfile {
             .map((p) => ProfilePrompt.fromJson(Map<String, dynamic>.from(p as Map)))
             .toList()
           ..sort((a, b) => a.position.compareTo(b.position));
+    final checks =
+        ((json['age_verifications'] as List?) ?? const []).map((v) => Map<String, dynamic>.from(v as Map)).toList()
+          ..sort((a, b) => (b['created_at'] as String).compareTo(a['created_at'] as String));
+    final latest = checks.firstOrNull;
+    final ageCheck = (json['age_verified'] as bool? ?? false)
+        ? AgeCheck.approved
+        : switch (latest?['status']) {
+            'pending' => AgeCheck.pending,
+            'rejected' => AgeCheck.rejected,
+            _ => AgeCheck.none,
+          };
+    final selfies =
+        ((json['verification_requests'] as List?) ?? const []).map((v) => Map<String, dynamic>.from(v as Map)).toList()
+          ..sort((a, b) => (b['created_at'] as String).compareTo(a['created_at'] as String));
     return MyProfile(
+      selfieStatus: selfies.firstOrNull?['status'] as String?,
+      selfieRejectReason: selfies.firstOrNull?['reject_reason'] as String?,
+      ageCheck: ageCheck,
+      ageRejectReason: ageCheck == AgeCheck.rejected ? (latest?['reject_reason'] as String?) : null,
       id: json['id'] as String,
       displayName: json['display_name'] as String,
       birthdate: DateTime.parse(json['birthdate'] as String),

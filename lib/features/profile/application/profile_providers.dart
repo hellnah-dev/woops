@@ -14,7 +14,11 @@ class MyProfileController extends AsyncNotifier<MyProfile?> {
   }
 
   Future<void> refresh() async {
-    state = await AsyncValue.guard(() => ref.read(profileRepositoryProvider).fetchMyProfile());
+    final next = await AsyncValue.guard(() => ref.read(profileRepositoryProvider).fetchMyProfile());
+    // A failed background refresh (e.g. offline on resume) keeps the last good
+    // profile; otherwise the router would bounce to the splash error screen.
+    if (next.hasError && state.hasValue) return;
+    state = next;
   }
 }
 
@@ -33,4 +37,11 @@ final discoveryPreferencesProvider = FutureProvider.autoDispose<DiscoveryPrefere
 /// Another user's public profile (matches / people who liked you).
 final publicProfileProvider = FutureProvider.autoDispose.family<ProfileCard?, String>((ref, userId) {
   return ref.watch(profileRepositoryProvider).fetchPublicProfile(userId);
+});
+
+/// My media on the server vs. the 5 MB allowance (profile + chat photos).
+final mediaUsageProvider = FutureProvider.autoDispose<({int used, int limit})>((ref) {
+  ref.watch(currentUserIdProvider);
+  ref.watch(myProfileProvider); // refresh when photos change
+  return ref.watch(profileRepositoryProvider).mediaUsage();
 });

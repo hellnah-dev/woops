@@ -16,6 +16,7 @@ class AppException implements Exception {
     'not_authenticated': 'Please sign in again.',
     'profile_incomplete': 'Finish setting up your profile first.',
     'profile_missing': 'Finish setting up your profile first.',
+    'profile_not_ready': 'Complete your profile to start matching.',
     'photo_required': 'Add at least one photo to continue.',
     'photo_limit': 'You can have up to 6 photos.',
     'underage': 'You must be at least 18 to use Woops.',
@@ -80,7 +81,8 @@ class AppException implements Exception {
       return 'An account with this email already exists. Try signing in.';
     }
     if (m.contains('password')) return _capitalize(e.message);
-    if (m.contains('rate limit')) return 'Too many attempts. Please wait a moment and try again.';
+    if (m.contains('email rate limit')) return 'Too many emails sent. Please wait up to an hour and try again.';
+    if (m.contains('rate limit')) return 'Too many attempts. Please wait 5 minutes and try again.';
     return _capitalize(e.message);
   }
 

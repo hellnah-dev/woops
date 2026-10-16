@@ -9,16 +9,24 @@ class LoadingView extends StatelessWidget {
 
   @override
   Widget build(BuildContext context) {
-    return Center(
-      child: Column(
-        mainAxisSize: MainAxisSize.min,
-        children: [
-          const CircularProgressIndicator(),
-          if (message != null) ...[
-            const SizedBox(height: AppSpacing.md),
-            Text(message!, style: Theme.of(context).textTheme.bodyMedium),
+    // Stays invisible for a moment, then fades in: quick loads never flash a
+    // spinner, slow ones still show progress.
+    return TweenAnimationBuilder<double>(
+      tween: Tween(begin: 0, end: 1),
+      duration: const Duration(milliseconds: 550),
+      curve: const Interval(0.45, 1, curve: Curves.easeOut),
+      builder: (context, opacity, child) => Opacity(opacity: opacity, child: child),
+      child: Center(
+        child: Column(
+          mainAxisSize: MainAxisSize.min,
+          children: [
+            const CircularProgressIndicator(),
+            if (message != null) ...[
+              const SizedBox(height: AppSpacing.md),
+              Text(message!, style: Theme.of(context).textTheme.bodyMedium),
+            ],
           ],
-        ],
+        ),
       ),
     );
   }

@@ -1,8 +1,11 @@
 import 'package:flutter/material.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
+import 'package:go_router/go_router.dart';
 
 import '../../../core/i18n/countries.dart';
+import '../../../core/router/app_router.dart';
 import '../../../core/theme/app_colors.dart';
+import '../../../core/utils/image_processing.dart';
 import '../../../core/utils/validators.dart';
 import '../../../core/widgets/choice_chips.dart';
 import '../../../core/widgets/confirm_dialog.dart';
@@ -131,7 +134,8 @@ class _EditProfileScreenState extends ConsumerState<EditProfileScreen> {
       await ref.read(myProfileProvider.notifier).refresh();
       if (!mounted) return;
       showSnack(context, 'Profile saved');
-      Navigator.pop(context);
+      // Always land back on the Profile tab, wherever editing was opened from.
+      context.go(Routes.profile);
     } catch (e) {
       if (mounted) showSnack(context, e);
     } finally {
@@ -165,7 +169,13 @@ class _EditProfileScreenState extends ConsumerState<EditProfileScreen> {
             child: ListView(
               padding: const EdgeInsets.fromLTRB(AppSpacing.lg, 0, AppSpacing.lg, AppSpacing.xxl),
               children: [
-                const SectionLabel('Photos', trailing: 'Tap a photo for options'),
+                SectionLabel(
+                  'Photos',
+                  trailing: switch (ref.watch(mediaUsageProvider).valueOrNull) {
+                    final u? => 'Media ${formatMb(u.used)} of ${formatMb(u.limit)}',
+                    null => 'Tap a photo for options',
+                  },
+                ),
                 const PhotoGridEditor(),
                 const SectionLabel('Name'),
                 TextFormField(
@@ -205,7 +215,7 @@ class _EditProfileScreenState extends ConsumerState<EditProfileScreen> {
                 OutlinedButton.icon(
                   onPressed: () async {
                     final c = await showCountryPicker(context, selected: _country);
-                    if (c != null) setState(() => _country = c.code);
+                    if (c != null && mounted) setState(() => _country = c.code);
                   },
                   icon: Text(countryByCode(_country)?.flag ?? '🌍', style: const TextStyle(fontSize: 20)),
                   label: Text(countryByCode(_country)?.name ?? 'Choose your country'),

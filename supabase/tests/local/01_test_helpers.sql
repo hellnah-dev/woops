@@ -31,4 +31,13 @@ create function tests.login(p_user uuid) returns void language sql as $$
   select set_config('request.jwt.claim.sub', coalesce(p_user::text, ''), false);
 $$;
 
+-- Completes a test profile (2 photos, bio, 3 interests, age confirmed) so it may swipe.
+create function tests.make_ready(p_user uuid) returns void language sql as $$
+  insert into public.profile_photos (user_id, storage_path) values (p_user, p_user::text || '/ready.jpg');
+  update public.profiles set bio = coalesce(nullif(bio, ''), 'Hello'), age_verified = true where id = p_user;
+  insert into public.profile_interests (user_id, interest_id)
+  select p_user, id from public.interests order by id limit 3
+  on conflict do nothing;
+$$;
+
 grant execute on all functions in schema tests to anon, authenticated, service_role;

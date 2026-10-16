@@ -3,6 +3,7 @@ import 'package:flutter_riverpod/flutter_riverpod.dart';
 import 'package:go_router/go_router.dart';
 
 import 'package:intl/intl.dart';
+import 'package:supabase_flutter/supabase_flutter.dart' show AuthException;
 
 import '../../../core/i18n/countries.dart';
 import '../../../core/router/app_router.dart';
@@ -14,6 +15,7 @@ import '../../../core/widgets/country_picker.dart';
 import '../../../core/widgets/state_views.dart';
 import '../../legal/legal_screen.dart';
 import '../data/auth_repository.dart';
+import 'auth_cooldown.dart';
 
 /// Shared scaffold for the auth forms.
 class _AuthScaffold extends StatelessWidget {
@@ -96,7 +98,28 @@ class _SignInScreenState extends ConsumerState<SignInScreen> {
   final _form = GlobalKey<FormState>();
   final _email = TextEditingController();
   final _password = TextEditingController();
+  final _cooldown = GlobalKey<CooldownBuilderState>();
   bool _loading = false;
+  int _wrongPasswords = 0;
+  bool _unconfirmed = false;
+  bool _resending = false;
+
+  Future<void> _resend() async {
+    setState(() => _resending = true);
+    try {
+      await ref.read(authRepositoryProvider).resendConfirmation(_email.text);
+      if (mounted) showSnack(context, 'Confirmation email sent to ${_email.text.trim()}. Check your inbox and spam.');
+    } catch (e) {
+      if (AuthCooldown.isRateLimited(e)) {
+        await AuthCooldown.start('resend', AuthCooldown.waitFor(e));
+        if (mounted) showSnack(context, 'Too many emails for now. Please try again in about an hour.', isError: true);
+      } else if (mounted) {
+        showSnack(context, e);
+      }
+    } finally {
+      if (mounted) setState(() => _resending = false);
+    }
+  }
 
   @override
   void dispose() {
@@ -112,7 +135,19 @@ class _SignInScreenState extends ConsumerState<SignInScreen> {
       await ref.read(authRepositoryProvider).signIn(email: _email.text, password: _password.text);
       // The router redirects automatically once the session exists.
     } catch (e) {
-      if (mounted) showSnack(context, e);
+      if (AuthCooldown.isRateLimited(e)) {
+        await AuthCooldown.start('sign_in', AuthCooldown.waitFor(e));
+        await _cooldown.currentState?.reload();
+      } else {
+        final m = e is AuthException ? e.message.toLowerCase() : '';
+        if (!mounted) return;
+        if (m.contains('invalid login')) setState(() => _wrongPasswords++);
+        if (m.contains('not confirmed')) {
+          setState(() => _unconfirmed = true); // explained below the button, with a resend option
+        } else if (mounted) {
+          showSnack(context, e);
+        }
+      }
     } finally {
       if (mounted) setState(() => _loading = false);
     }
@@ -152,7 +187,50 @@ class _SignInScreenState extends ConsumerState<SignInScreen> {
                 ),
               ),
               const SizedBox(height: AppSpacing.md),
-              PrimaryButton(label: 'Sign in', loading: _loading, onPressed: _submit),
+              CooldownBuilder(
+                key: _cooldown,
+                action: 'sign_in',
+                builder: (context, wait) => Column(
+                  crossAxisAlignment: CrossAxisAlignment.stretch,
+                  children: [
+                    PrimaryButton(
+                      label: wait == null ? 'Sign in' : 'Try again in ${formatWait(wait)}',
+                      loading: _loading,
+                      onPressed: wait == null ? _submit : null,
+                    ),
+                    if (wait != null) CooldownNotice(remaining: wait, what: 'sign in'),
+                    if (wait == null && _unconfirmed)
+                      Padding(
+                        padding: const EdgeInsets.only(top: 12),
+                        child: Column(
+                          crossAxisAlignment: CrossAxisAlignment.stretch,
+                          children: [
+                            Text(
+                              'Please confirm your email first: open the link we sent to ${_email.text.trim()}.',
+                              textAlign: TextAlign.center,
+                            ),
+                            const SizedBox(height: 8),
+                            OutlinedButton.icon(
+                              key: const Key('resend-confirmation'),
+                              onPressed: _resending ? null : _resend,
+                              icon: const Icon(Icons.mark_email_unread_outlined),
+                              label: const Text('Resend confirmation email'),
+                            ),
+                          ],
+                        ),
+                      ),
+                    if (wait == null && _wrongPasswords >= 3)
+                      Padding(
+                        padding: const EdgeInsets.only(top: 12),
+                        child: OutlinedButton.icon(
+                          onPressed: () => context.push(Routes.forgotPassword),
+                          icon: const Icon(Icons.lock_reset_rounded),
+                          label: const Text('Trouble signing in? Reset your password'),
+                        ),
+                      ),
+                  ],
+                ),
+              ),
               const SizedBox(height: AppSpacing.md),
               TextButton(
                 onPressed: () => context.pushReplacement(Routes.signUp),
@@ -187,6 +265,7 @@ class _SignUpScreenState extends ConsumerState<SignUpScreen> {
   bool _acceptTerms = false;
   bool _acceptGuidelines = false;
   bool _showErrors = false;
+  final _cooldown = GlobalKey<CooldownBuilderState>();
   bool _loading = false;
   int? _blockedMinAge;
 
@@ -208,12 +287,12 @@ class _SignUpScreenState extends ConsumerState<SignUpScreen> {
       helpText: 'Your date of birth',
       initialEntryMode: DatePickerEntryMode.input,
     );
-    if (picked != null) setState(() => _birthdate = picked);
+    if (picked != null && mounted) setState(() => _birthdate = picked);
   }
 
   Future<void> _pickCountry() async {
     final c = await showCountryPicker(context, selected: _country);
-    if (c != null) setState(() => _country = c.code);
+    if (c != null && mounted) setState(() => _country = c.code);
   }
 
   bool get _gateComplete => _birthdate != null && _country != null && _acceptTerms && _acceptGuidelines;
@@ -228,20 +307,45 @@ class _SignUpScreenState extends ConsumerState<SignUpScreen> {
     try {
       final minAge = await auth.minAgeFor(_country!);
       if (ageFromBirthdate(_birthdate!) < minAge) {
-        setState(() => _blockedMinAge = minAge);
+        if (mounted) setState(() => _blockedMinAge = minAge);
         return;
       }
-      final signedIn = await auth.signUp(
+      final result = await auth.signUp(
         email: _email.text,
         password: _password.text,
         birthdate: _birthdate!,
         countryCode: _country!,
       );
-      if (signedIn) {
+      if (result == SignUpResult.signedIn) {
         await auth.acceptLegal(LegalDoc.version).catchError((_) {});
       }
       if (!mounted) return;
-      if (!signedIn) {
+      if (result == SignUpResult.alreadyRegistered) {
+        final goTo = await showDialog<String>(
+          context: context,
+          builder: (context) => AlertDialog(
+            icon: const Icon(Icons.person_search_outlined),
+            title: const Text('You already have an account'),
+            content: Text(
+              '${_email.text.trim()} is already registered. Sign in, or reset your password if you forgot it.',
+            ),
+            actions: [
+              TextButton(
+                onPressed: () => Navigator.pop(context, Routes.forgotPassword),
+                child: const Text('Reset password'),
+              ),
+              FilledButton(
+                style: FilledButton.styleFrom(minimumSize: const Size(100, 44)),
+                onPressed: () => Navigator.pop(context, Routes.signIn),
+                child: const Text('Sign in'),
+              ),
+            ],
+          ),
+        );
+        if (mounted && goTo != null) context.go(goTo);
+        return;
+      }
+      if (result == SignUpResult.confirmEmail) {
         await showDialog<void>(
           context: context,
           builder: (context) => AlertDialog(
@@ -257,7 +361,12 @@ class _SignUpScreenState extends ConsumerState<SignUpScreen> {
         if (mounted) context.go(Routes.signIn);
       }
     } catch (e) {
-      if (mounted) showSnack(context, e);
+      if (AuthCooldown.isRateLimited(e)) {
+        await AuthCooldown.start('sign_up', AuthCooldown.waitFor(e));
+        await _cooldown.currentState?.reload();
+      } else if (mounted) {
+        showSnack(context, e);
+      }
     } finally {
       if (mounted) setState(() => _loading = false);
     }
@@ -365,7 +474,21 @@ class _SignUpScreenState extends ConsumerState<SignUpScreen> {
                     : null,
               ),
               const SizedBox(height: AppSpacing.md),
-              PrimaryButton(label: 'Create account', loading: _loading, onPressed: _submit),
+              CooldownBuilder(
+                key: _cooldown,
+                action: 'sign_up',
+                builder: (context, wait) => Column(
+                  crossAxisAlignment: CrossAxisAlignment.stretch,
+                  children: [
+                    PrimaryButton(
+                      label: wait == null ? 'Create account' : 'Try again in ${formatWait(wait)}',
+                      loading: _loading,
+                      onPressed: wait == null ? _submit : null,
+                    ),
+                    if (wait != null) CooldownNotice(remaining: wait, what: 'create an account'),
+                  ],
+                ),
+              ),
             ],
           ),
         ),
@@ -435,6 +558,7 @@ class ForgotPasswordScreen extends ConsumerStatefulWidget {
 class _ForgotPasswordScreenState extends ConsumerState<ForgotPasswordScreen> {
   final _form = GlobalKey<FormState>();
   final _email = TextEditingController();
+  final _cooldown = GlobalKey<CooldownBuilderState>();
   bool _loading = false;
   bool _sent = false;
 
@@ -451,7 +575,12 @@ class _ForgotPasswordScreenState extends ConsumerState<ForgotPasswordScreen> {
       await ref.read(authRepositoryProvider).sendPasswordReset(_email.text);
       if (mounted) setState(() => _sent = true);
     } catch (e) {
-      if (mounted) showSnack(context, e);
+      if (AuthCooldown.isRateLimited(e)) {
+        await AuthCooldown.start('reset', AuthCooldown.waitFor(e));
+        await _cooldown.currentState?.reload();
+      } else if (mounted) {
+        showSnack(context, e);
+      }
     } finally {
       if (mounted) setState(() => _loading = false);
     }
@@ -478,7 +607,21 @@ class _ForgotPasswordScreenState extends ConsumerState<ForgotPasswordScreen> {
                     decoration: const InputDecoration(labelText: 'Email'),
                   ),
                   const SizedBox(height: AppSpacing.lg),
-                  PrimaryButton(label: 'Send reset link', loading: _loading, onPressed: _submit),
+                  CooldownBuilder(
+                    key: _cooldown,
+                    action: 'reset',
+                    builder: (context, wait) => Column(
+                      crossAxisAlignment: CrossAxisAlignment.stretch,
+                      children: [
+                        PrimaryButton(
+                          label: wait == null ? 'Send reset link' : 'Try again in ${formatWait(wait)}',
+                          loading: _loading,
+                          onPressed: wait == null ? _submit : null,
+                        ),
+                        if (wait != null) CooldownNotice(remaining: wait, what: 'request a reset link'),
+                      ],
+                    ),
+                  ),
                 ],
               ),
             ),

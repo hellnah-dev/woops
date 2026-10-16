@@ -50,7 +50,69 @@ void main() {
     });
     expect(p.primaryPhoto, 'me/a.jpg');
     expect(p.interestIds, {1});
-    expect(p.completeness, closeTo(0.2, 0.001)); // 2 of 4 photos
+    expect(p.completeness, closeTo(0.175, 0.001)); // 2 of 4 photos
+    expect(p.missingSteps, [ProfileStep.bio, ProfileStep.interests, ProfileStep.ageCheck]);
+    expect(p.isReadyToDate, isFalse);
+  });
+
+  test('the 100% checklist adds up and says what each missing item is worth', () {
+    final p = MyProfile.fromJson({
+      'id': 'me',
+      'display_name': 'Me',
+      'birthdate': '1998-05-01',
+      'gender': 'man',
+      'bio': '',
+      'intention': 'friends',
+      'profile_photos': [],
+    });
+    expect(p.completionItems.fold<double>(0, (s, i) => s + i.weight), closeTo(1, 1e-9));
+    expect(p.completenessPercent, 0);
+    expect(p.completionItems.map((i) => i.remainingPercent).reduce((a, b) => a + b), 100);
+    expect(
+      ProfileCard.fromJson({'id': 'x', 'display_name': 'X', 'age': 30, 'gender': 'man', 'is_repeat': true}).isRepeat,
+      isTrue,
+    );
+  });
+
+  test('a pending ID review counts as ready; a rejected one does not', () {
+    Map<String, dynamic> json(String status) => {
+      'id': 'me',
+      'display_name': 'Me',
+      'birthdate': '1998-05-01',
+      'gender': 'man',
+      'bio': 'Hi',
+      'intention': 'friends',
+      'profile_photos': [
+        {'id': 'a', 'storage_path': 'me/a.jpg', 'position': 0},
+        {'id': 'b', 'storage_path': 'me/b.jpg', 'position': 1},
+      ],
+      'profile_interests': [
+        {'interest_id': 1},
+        {'interest_id': 2},
+        {'interest_id': 3},
+      ],
+      'age_verifications': [
+        {'status': 'rejected', 'reject_reason': 'blurry', 'created_at': '2026-10-01T00:00:00Z'},
+        {'status': status, 'reject_reason': null, 'created_at': '2026-10-02T00:00:00Z'},
+      ],
+    };
+    expect(MyProfile.fromJson(json('pending')).isReadyToDate, isTrue);
+    final rejected = MyProfile.fromJson(json('rejected'));
+    expect(rejected.ageCheck, AgeCheck.rejected);
+    expect(rejected.missingSteps, [ProfileStep.ageCheck]);
+    expect(MyProfile.fromJson({...json('pending'), 'age_verified': true}).ageCheck, AgeCheck.approved);
+  });
+
+  test('ProfileCard reads the random-pick flag (defaults to false)', () {
+    Map<String, dynamic> json([Map<String, dynamic> extra = const {}]) => {
+      'id': 'x',
+      'display_name': 'X',
+      'age': 25,
+      'gender': 'woman',
+      ...extra,
+    };
+    expect(ProfileCard.fromJson(json()).isRandom, isFalse);
+    expect(ProfileCard.fromJson(json({'is_random': true})).isRandom, isTrue);
   });
 
   test('DiscoveryPreferences round-trips to the database shape', () {

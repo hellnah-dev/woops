@@ -40,3 +40,7 @@ verify_jwt = false
 # Called by Database Webhooks, authenticated by the x-webhook-secret header.
 [functions.admin-alerts]
 verify_jwt = false
+
+[functions.cleanup-proofs]
+# Called by the daily schedule with x-cleanup-secret (see schedule_cleanup.sql).
+verify_jwt = false

@@ -276,7 +276,10 @@ class _PhotoGridEditorState extends ConsumerState<PhotoGridEditor> {
                       feedback: SizedBox(
                         width: tileWidth,
                         height: tileWidth / 0.75,
-                        child: Opacity(opacity: 0.9, child: Material(color: Colors.transparent, child: tile)),
+                        child: Opacity(
+                          opacity: 0.9,
+                          child: Material(color: Colors.transparent, child: tile),
+                        ),
                       ),
                       childWhenDragging: Opacity(opacity: 0.3, child: tile),
                       onDragStarted: HapticFeedback.mediumImpact,
@@ -324,11 +327,7 @@ class _PhotoGridEditorState extends ConsumerState<PhotoGridEditor> {
           child: Center(
             child: isNextSlot && _uploading
                 ? const CircularProgressIndicator()
-                : Icon(
-                    Icons.add_circle_rounded,
-                    size: 32,
-                    color: isNextSlot ? scheme.primary : scheme.outlineVariant,
-                  ),
+                : Icon(Icons.add_circle_rounded, size: 32, color: isNextSlot ? scheme.primary : scheme.outlineVariant),
           ),
         ),
       ),

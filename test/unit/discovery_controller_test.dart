@@ -118,4 +118,17 @@ void main() {
     expect(ids.toSet().length, ids.length);
     expect(ids, contains('new'));
   });
+
+  test('after the last card, it asks again so seen people can come back', () async {
+    repo = FakeDiscoveryRepository([
+      [card('a')], // only one person, feed "exhausted"
+      [card('a2')], // the server brings someone back as a second look
+    ]);
+    final c = await start();
+    expect(state().exhausted, isTrue);
+    await c.swipe(card('a'), SwipeAction.like);
+    await pumpEventQueue();
+    expect(repo.feedCalls, 2);
+    expect(state().queue.map((x) => x.id), ['a2']);
+  });
 }

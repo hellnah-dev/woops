@@ -6,6 +6,8 @@
 //   INSERT public.messages  -> "New message"
 //   INSERT public.matches   -> "It's a match!"
 //   INSERT public.swipes    -> "Someone liked you" (likes only; never reveals who)
+//   UPDATE public.verification_requests -> "You're verified" / "Selfie not approved"
+//   UPDATE public.age_verifications     -> "Age confirmed" / "ID not approved"
 // Each webhook must send the header `x-webhook-secret: <PUSH_WEBHOOK_SECRET>`.
 //
 // Required secrets (supabase secrets set ...):
@@ -19,13 +21,15 @@ type WebhookPayload = {
   table: string;
   schema: string;
   record: Record<string, unknown>;
+  old_record?: Record<string, unknown> | null;
 };
 
 type ServiceAccount = { project_id: string; client_email: string; private_key: string };
 
 type Push = {
   userId: string;
-  pref: "new_messages" | "new_matches" | "new_likes";
+  // "account" notifications (review results) are always sent.
+  pref: "new_messages" | "new_matches" | "new_likes" | "account";
   title: string;
   body: string;
   data: Record<string, string>;
@@ -67,6 +71,25 @@ async function displayName(db: SupabaseClient, userId: string): Promise<string> 
 
 async function buildPushes(db: SupabaseClient, payload: WebhookPayload): Promise<Push[]> {
   const r = payload.record;
+
+  // Review results: a pending selfie / ID was approved or rejected.
+  if (payload.type === "UPDATE" &&
+      (payload.table === "verification_requests" || payload.table === "age_verifications")) {
+    if (payload.old_record?.status !== "pending" || r.status === "pending") return [];
+    const approved = r.status === "approved";
+    const isId = payload.table === "age_verifications";
+    const reason = r.reject_reason ? ` ${truncate(String(r.reject_reason), 100)}` : "";
+    return [{
+      userId: r.user_id as string,
+      pref: "account",
+      title: approved ? (isId ? "Age confirmed ✅" : "You’re verified 💙") : (isId ? "ID not approved" : "Selfie not approved"),
+      body: approved
+        ? (isId ? "Thanks! Your ID was checked and deleted. Happy matching!" : "Your profile now shows the blue verified badge.")
+        : `Please try again.${reason}`,
+      data: { type: isId ? "age_check" : "verification", status: String(r.status) },
+    }];
+  }
+
   if (payload.type !== "INSERT") return [];
 
   if (payload.table === "messages") {
@@ -78,7 +101,9 @@ async function buildPushes(db: SupabaseClient, payload: WebhookPayload): Promise
       .eq("conversation_id", r.conversation_id as string)
       .neq("user_id", senderId);
     const name = await displayName(db, senderId);
-    const body = r.kind === "image" ? "Sent you a photo" : truncate(String(r.body ?? ""));
+    // End-to-end encrypted messages can't be read here: show a neutral text.
+    const encrypted = (r.metadata as Record<string, unknown> | undefined)?.e2e === true;
+    const body = r.kind === "image" ? "Sent you a photo 📷" : encrypted ? "New message 🔒" : truncate(String(r.body ?? ""));
     return (members ?? []).map((m) => ({
       userId: m.user_id as string,
       pref: "new_messages" as const,
@@ -154,7 +179,7 @@ Deno.serve(async (req) => {
 
   for (const push of pushes) {
     const pref = prefByUser.get(push.userId);
-    if (pref && pref[push.pref] === false) continue;
+    if (push.pref !== "account" && pref && pref[push.pref] === false) continue;
 
     for (const t of (tokens ?? []).filter((t) => t.user_id === push.userId)) {
       const res = await fetch(`https://fcm.googleapis.com/v1/projects/${sa.project_id}/messages:send`, {

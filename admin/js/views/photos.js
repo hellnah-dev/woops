@@ -10,7 +10,7 @@ export async function render(view, _params, rerender) {
     <div class="page-head"><div><h1>Photo review</h1><p class="muted">Newest uploads first. Remove anything that breaks the Community Guidelines.</p></div></div>
     <div class="photo-grid">${rows.map((r) => `
       <div class="photo-tile">
-        <img alt="" loading="lazy" src="${esc(urls[thumbPath(r.storage_path)] || full[r.storage_path] || '')}"
+        <img alt="" loading="lazy" data-zoom="${esc(r.display_name)}" src="${esc(urls[thumbPath(r.storage_path)] || full[r.storage_path] || '')}"
              data-full="${esc(full[r.storage_path] ?? '')}">
         <div class="meta"><a href="#/users/${esc(r.user_id)}" style="color:#fff">${esc(r.display_name)}</a>
           <span>${esc(timeAgo(r.created_at))}</span>

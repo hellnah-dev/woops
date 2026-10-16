@@ -26,9 +26,9 @@ class SafetyRepository {
 
   Future<void> unblock(String userId) => _client.rpc('unblock_user', params: {'p_target': userId});
 
-  Future<void> report(String userId, ReportReason reason, {String? details, String? messageId}) => _client.rpc(
+  Future<void> report(String userId, ReportReason reason, {String? details, String? messageBody}) => _client.rpc(
     'report_user',
-    params: {'p_target': userId, 'p_reason': reason.value, 'p_details': details, 'p_message_id': messageId},
+    params: {'p_target': userId, 'p_reason': reason.value, 'p_details': details, 'p_message_body': messageBody},
   );
 
   Future<List<BlockedUser>> blockedUsers() async {

@@ -4,6 +4,7 @@ import 'package:flutter_riverpod/flutter_riverpod.dart';
 
 import 'core/router/app_router.dart';
 import 'core/theme/app_theme.dart';
+import 'features/intro/intro_overlay.dart';
 
 final scaffoldMessengerKey = GlobalKey<ScaffoldMessengerState>();
 
@@ -21,6 +22,8 @@ class WoopsApp extends ConsumerWidget {
       themeMode: ThemeMode.system,
       scaffoldMessengerKey: scaffoldMessengerKey,
       routerConfig: router,
+      scrollBehavior: const _SmoothScrollBehavior(),
+      builder: (context, child) => IntroOverlay(child: child ?? const SizedBox.shrink()),
       // System widgets (date pickers, dialogs, text selection) follow the
       // phone's language, and right-to-left languages mirror the layout.
       // App text is English for now; see README "Translations".
@@ -28,4 +31,13 @@ class WoopsApp extends ConsumerWidget {
       supportedLocales: kMaterialSupportedLanguages.map(Locale.new),
     );
   }
+}
+
+/// iOS-style bouncy scrolling everywhere, for a softer feel.
+class _SmoothScrollBehavior extends MaterialScrollBehavior {
+  const _SmoothScrollBehavior();
+
+  @override
+  ScrollPhysics getScrollPhysics(BuildContext context) =>
+      const BouncingScrollPhysics(parent: AlwaysScrollableScrollPhysics());
 }

@@ -2,7 +2,7 @@
 
 Last updated: 14 October 2026
 
-These Terms are an agreement between you and [COMPANY NAME] about your use of Woops (the "App"). By creating an account you accept these Terms, our Privacy Policy and our Community Guidelines.
+These Terms are an agreement between you and HellNah about your use of Woops (the "App"). By creating an account you accept these Terms, our Privacy Policy and our Community Guidelines.
 
 ## 1. Who can use Woops
 - You must be **at least 18 years old**, or older if the law where you live sets a higher age of majority (for example 19 or 21). We enforce these limits when you sign up.
@@ -45,4 +45,4 @@ We may update these Terms. We will tell you in the App about important changes a
 These Terms are governed by the laws of [COUNTRY / STATE], except where the law of your country of residence gives you protections that cannot be waived.
 
 ## 11. Contact
-[COMPANY NAME], [ADDRESS] · support@example.com
+HellNah, [ADDRESS] · Support: https://kamaucha.me/rammy24d · Developer: rammy24d

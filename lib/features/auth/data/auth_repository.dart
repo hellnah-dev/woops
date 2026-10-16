@@ -6,18 +6,29 @@ import 'package:intl/intl.dart';
 import '../../../core/config/env.dart';
 import '../../../core/supabase/supabase_providers.dart';
 
+enum SignUpResult {
+  /// Account created and signed in (email confirmation is off).
+  signedIn,
+
+  /// Account created; a confirmation link was emailed.
+  confirmEmail,
+
+  /// This email already has an account (Supabase sends no email in this case).
+  alreadyRegistered,
+}
+
 class AuthRepository {
   AuthRepository(this._client);
   final SupabaseClient _client;
 
   GoTrueClient get _auth => _client.auth;
 
-  /// Returns true when the user is signed in immediately, false when they must
-  /// first confirm their email (depends on Supabase "Confirm email" setting).
+  /// Whether the user is signed in right away, must confirm their email first
+  /// (Supabase "Confirm email" setting), or already has an account.
   ///
   /// [birthdate] and [countryCode] from the age gate are stored with the
   /// account; the server rejects a profile whose birthdate doesn't match.
-  Future<bool> signUp({
+  Future<SignUpResult> signUp({
     required String email,
     required String password,
     required DateTime birthdate,
@@ -29,8 +40,16 @@ class AuthRepository {
       emailRedirectTo: Env.authRedirectUrl,
       data: {'birthdate': DateFormat('yyyy-MM-dd').format(birthdate), 'country_code': countryCode},
     );
-    return res.session != null;
+    if (res.session != null) return SignUpResult.signedIn;
+    // With email confirmation on, Supabase answers an existing email with a
+    // user that has no identities (and sends nothing), to avoid leaking accounts.
+    if (res.user != null && (res.user!.identities?.isEmpty ?? false)) return SignUpResult.alreadyRegistered;
+    return SignUpResult.confirmEmail;
   }
+
+  /// Sends the sign-up confirmation email again.
+  Future<void> resendConfirmation(String email) =>
+      _auth.resend(type: OtpType.signup, email: email.trim(), emailRedirectTo: Env.authRedirectUrl);
 
   /// Birthdate/country entered at the sign-up age gate, if any.
   ({DateTime? birthdate, String? countryCode}) get ageGateData {

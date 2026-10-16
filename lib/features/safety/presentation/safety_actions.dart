@@ -26,7 +26,8 @@ Future<bool> confirmAndBlock(
     icon: Icons.block_rounded,
     destructive: true,
     title: 'Block $name?',
-    message: '$name won’t be able to see your profile or message you, and you’ll be unmatched. '
+    message:
+        '$name won’t be able to see your profile or message you, and you’ll be unmatched. '
         'They won’t be told that you blocked them.',
     confirmLabel: 'Block',
   );
@@ -48,24 +49,24 @@ Future<bool> showReportSheet(
   WidgetRef ref, {
   required String userId,
   required String name,
-  String? messageId,
+  String? messageBody,
 }) async {
   final sent = await showModalBottomSheet<bool>(
     context: context,
     isScrollControlled: true,
     useSafeArea: true,
-    builder: (_) => _ReportSheet(userId: userId, name: name, messageId: messageId),
+    builder: (_) => _ReportSheet(userId: userId, name: name, messageBody: messageBody),
   );
   if (sent == true) _afterSafetyAction(ref);
   return sent == true;
 }
 
 class _ReportSheet extends ConsumerStatefulWidget {
-  const _ReportSheet({required this.userId, required this.name, this.messageId});
+  const _ReportSheet({required this.userId, required this.name, this.messageBody});
 
   final String userId;
   final String name;
-  final String? messageId;
+  final String? messageBody;
 
   @override
   ConsumerState<_ReportSheet> createState() => _ReportSheetState();
@@ -93,7 +94,7 @@ class _ReportSheetState extends ConsumerState<_ReportSheet> {
         widget.userId,
         reason,
         details: _details.text.trim().isEmpty ? null : _details.text.trim(),
-        messageId: widget.messageId,
+        messageBody: widget.messageBody,
       );
       if (_alsoBlock) await repo.block(widget.userId);
       if (!mounted) return;

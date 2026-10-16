@@ -11,7 +11,7 @@ class LocationService {
 
   /// Asks for permission if needed and saves the approximate location.
   /// Throws [AppException] with a helpful message when not possible.
-  Future<void> updateMyLocation() async {
+  Future<Position> updateMyLocation() async {
     if (!await Geolocator.isLocationServiceEnabled()) {
       throw const AppException('Location services are turned off. Turn them on in your phone settings.');
     }
@@ -28,10 +28,36 @@ class LocationService {
         code: 'location_denied_forever',
       );
     }
-    final position = await Geolocator.getCurrentPosition(
-      locationSettings: const LocationSettings(accuracy: LocationAccuracy.low, timeLimit: Duration(seconds: 15)),
-    );
+    final position = await _freshPosition();
     await _profiles.setLocation(lat: position.latitude, lng: position.longitude);
+    return position;
+  }
+
+  /// Medium accuracy (~100 m, Wi-Fi/GPS) so the map is right; the server still
+  /// rounds what it stores to ~1 km. Falls back to the last known fix.
+  Future<Position> _freshPosition() async {
+    try {
+      return await Geolocator.getCurrentPosition(
+        locationSettings: const LocationSettings(accuracy: LocationAccuracy.medium, timeLimit: Duration(seconds: 12)),
+      );
+    } catch (_) {
+      final last = await Geolocator.getLastKnownPosition();
+      if (last != null) return last;
+      throw const AppException('Couldn’t get your location. Try again outdoors or check location settings.');
+    }
+  }
+
+  /// Quietly refreshes the saved location if permission was already given.
+  /// Never prompts. Returns the position, or null if not allowed.
+  Future<Position?> refreshIfAllowed() async {
+    try {
+      final permission = await Geolocator.checkPermission();
+      if (permission != LocationPermission.always && permission != LocationPermission.whileInUse) return null;
+      if (!await Geolocator.isLocationServiceEnabled()) return null;
+      return await updateMyLocation();
+    } catch (_) {
+      return null;
+    }
   }
 
   Future<bool> openSettings() => Geolocator.openAppSettings();

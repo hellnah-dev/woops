@@ -56,6 +56,9 @@ class _OnboardingScreenState extends ConsumerState<OnboardingScreen> {
 
   List<_Step>? _steps;
   int _index = 0;
+
+  /// Direction of the last step change, so the slide matches it.
+  bool _forward = true;
   bool _busy = false;
   bool _profileCreated = false;
 
@@ -168,7 +171,12 @@ class _OnboardingScreenState extends ConsumerState<OnboardingScreen> {
         await _finish();
         return;
       }
-      setState(() => _index++);
+      if (mounted) {
+        setState(() {
+          _forward = true;
+          _index++;
+        });
+      }
     } catch (e) {
       if (mounted) showSnack(context, e);
     } finally {
@@ -208,7 +216,11 @@ class _OnboardingScreenState extends ConsumerState<OnboardingScreen> {
   }
 
   void _back() {
-    if (_canGoBack) setState(() => _index--);
+    if (!_canGoBack) return;
+    setState(() {
+      _forward = false;
+      _index--;
+    });
   }
 
   Future<void> _pickBirthdate() async {
@@ -221,7 +233,7 @@ class _OnboardingScreenState extends ConsumerState<OnboardingScreen> {
       helpText: 'Your birthday',
       initialEntryMode: DatePickerEntryMode.input,
     );
-    if (picked != null) setState(() => _birthdate = picked);
+    if (picked != null && mounted) setState(() => _birthdate = picked);
   }
 
   @override
@@ -251,7 +263,8 @@ class _OnboardingScreenState extends ConsumerState<OnboardingScreen> {
                 final ok = await confirmAction(
                   context,
                   title: 'Sign out?',
-                  message: 'Anything you haven’t finished on this step won’t be saved. '
+                  message:
+                      'Anything you haven’t finished on this step won’t be saved. '
                       'You can continue setting up your profile next time you sign in.',
                   confirmLabel: 'Sign out',
                 );
@@ -267,13 +280,22 @@ class _OnboardingScreenState extends ConsumerState<OnboardingScreen> {
               Expanded(
                 child: AnimatedSwitcher(
                   duration: const Duration(milliseconds: 250),
-                  transitionBuilder: (child, animation) => FadeTransition(
-                    opacity: animation,
-                    child: SlideTransition(
-                      position: Tween(begin: const Offset(0.06, 0), end: Offset.zero).animate(animation),
-                      child: child,
-                    ),
-                  ),
+                  transitionBuilder: (child, animation) {
+                    // New step comes in from the side you're heading to; the
+                    // old one leaves towards the other side.
+                    final incoming = child.key == ValueKey(_step);
+                    final dx = (incoming == _forward) ? 0.06 : -0.06;
+                    return FadeTransition(
+                      opacity: animation,
+                      child: SlideTransition(
+                        position: Tween(
+                          begin: Offset(dx, 0),
+                          end: Offset.zero,
+                        ).animate(CurvedAnimation(parent: animation, curve: Curves.easeOutCubic)),
+                        child: child,
+                      ),
+                    );
+                  },
                   child: SingleChildScrollView(
                     key: ValueKey(_step),
                     padding: const EdgeInsets.fromLTRB(AppSpacing.lg, AppSpacing.md, AppSpacing.lg, AppSpacing.lg),
@@ -392,7 +414,7 @@ class _OnboardingScreenState extends ConsumerState<OnboardingScreen> {
             OutlinedButton.icon(
               onPressed: () async {
                 final c = await showCountryPicker(context, selected: _country);
-                if (c != null) setState(() => _country = c.code);
+                if (c != null && mounted) setState(() => _country = c.code);
               },
               icon: Text(country?.flag ?? '🌍', style: const TextStyle(fontSize: 20)),
               label: Text(country?.name ?? 'Choose your country'),
