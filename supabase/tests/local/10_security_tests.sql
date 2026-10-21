@@ -479,6 +479,33 @@ select tests.ok(exists (select 1 from public.get_map_people() where id = :H), 'm
 select tests.ok((select abs(lat / 0.02 - round(lat / 0.02)) < 1e-6 from public.get_map_people() where id = :H),
                 'map positions are snapped to a ~2 km grid');
 select tests.ok((select count(*) from public.get_my_location()) = 1, 'I can read my own saved location');
+-- Map view: one call with me, people and matches.
+select tests.ok(jsonb_array_length(public.get_map_view() -> 'people') >= 1, 'map view returns nearby people in one call');
+select tests.ok((public.get_map_view() -> 'me' ->> 'lat') is not null, 'map view includes my position');
+reset role;
+insert into public.matches (user_low, user_high) values (least(:G::uuid, :H::uuid), greatest(:G::uuid, :H::uuid)) on conflict do nothing;
+insert into public.conversations (match_id)
+select id from public.matches where user_low = least(:G::uuid, :H::uuid) and user_high = greatest(:G::uuid, :H::uuid)
+on conflict do nothing;
+set role authenticated;
+select tests.login(:G);
+select tests.ok((select (x ->> 'id') = :H from jsonb_array_elements(public.get_map_view() -> 'matches') x limit 1),
+                'my matches appear on the map');
+select tests.ok((select abs((x ->> 'lat')::float8 / 0.02 - round((x ->> 'lat')::float8 / 0.02)) < 1e-6
+                   from jsonb_array_elements(public.get_map_view() -> 'matches') x limit 1),
+                'match positions are snapped to the same ~2 km grid');
+select tests.ok((select (x ? 'conversation_id') from jsonb_array_elements(public.get_map_view() -> 'matches') x limit 1),
+                'map matches carry the conversation to open the chat');
+select tests.login(:H);
+update public.privacy_settings set show_distance = false;
+select tests.login(:G);
+select tests.ok(jsonb_array_length(public.get_map_view() -> 'matches') = 0, 'a match who hides their distance is not on the map');
+select tests.login(:H);
+update public.privacy_settings set show_distance = true;
+reset role;
+delete from public.matches where user_low = least(:G::uuid, :H::uuid) and user_high = greatest(:G::uuid, :H::uuid);
+set role authenticated;
+select tests.login(:G);
 
 -- ID document age review
 select tests.login(:F);

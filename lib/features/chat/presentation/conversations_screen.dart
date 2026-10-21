@@ -11,6 +11,7 @@ import '../../../core/widgets/profile_photo.dart';
 import '../../../core/widgets/state_views.dart';
 import '../../matches/presentation/matches_screen.dart';
 import '../application/chat_controllers.dart';
+import 'conversation_actions.dart';
 import '../domain/chat_models.dart';
 
 class ConversationsScreen extends ConsumerWidget {
@@ -51,6 +52,7 @@ class ConversationsScreen extends ConsumerWidget {
                         return InkWell(
                           borderRadius: BorderRadius.circular(AppRadius.md),
                           onTap: () => openConversation(context, c),
+                          onLongPress: () => showConversationActions(context, ref, c),
                           child: SizedBox(
                             width: 72,
                             child: Column(
@@ -82,7 +84,11 @@ class ConversationsScreen extends ConsumerWidget {
                   )
                 else
                   for (final (i, c) in chats.indexed) ...[
-                    _ConversationTile(summary: c, myId: myId),
+                    _ConversationTile(
+                      summary: c,
+                      myId: myId,
+                      onLongPress: () => showConversationActions(context, ref, c),
+                    ),
                     // One paced "Sponsored" card after the third chat, never between more.
                     if (i == 2)
                       const Padding(
@@ -100,9 +106,10 @@ class ConversationsScreen extends ConsumerWidget {
 }
 
 class _ConversationTile extends StatelessWidget {
-  const _ConversationTile({required this.summary, required this.myId});
+  const _ConversationTile({required this.summary, required this.myId, this.onLongPress});
   final ConversationSummary summary;
   final String myId;
+  final VoidCallback? onLongPress;
 
   @override
   Widget build(BuildContext context) {
@@ -145,6 +152,7 @@ class _ConversationTile extends StatelessWidget {
         ],
       ),
       onTap: () => openConversation(context, summary),
+      onLongPress: onLongPress,
     );
   }
 }

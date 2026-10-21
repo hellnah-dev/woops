@@ -119,13 +119,26 @@ class _NativeAdCardState extends ConsumerState<NativeAdCard> {
   NativeAd? _ad;
   bool _loaded = false;
 
-  /// Decided once per card: only load if the pacing allows an ad right now.
-  bool? _allowed;
+  /// While pacing says "not now" (first minute, or the 5-minute limit is
+  /// reached), check again every 30 seconds; the ad loads once it's allowed.
+  Timer? _recheck;
+
+  @override
+  void initState() {
+    super.initState();
+    _recheck = Timer.periodic(const Duration(seconds: 30), (_) {
+      if (_ad != null) {
+        _recheck?.cancel();
+      } else if (mounted) {
+        setState(() {});
+      }
+    });
+  }
 
   void _load(BuildContext context) {
     final unit = AdsConfig.nativeUnitId;
-    _allowed ??= ref.read(adPacerProvider.notifier).canShow;
-    if (_ad != null || unit == null || _allowed != true) return;
+    if (_ad != null || unit == null || !ref.read(adPacerProvider.notifier).canShow) return;
+    _recheck?.cancel();
     final dark = Theme.of(context).brightness == Brightness.dark;
     _ad = NativeAd(
       adUnitId: unit,
@@ -145,6 +158,7 @@ class _NativeAdCardState extends ConsumerState<NativeAdCard> {
 
   @override
   void dispose() {
+    _recheck?.cancel();
     _ad?.dispose();
     super.dispose();
   }

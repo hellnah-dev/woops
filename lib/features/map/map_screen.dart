@@ -33,6 +33,9 @@ class _MapScreenState extends ConsumerState<MapScreen> {
   String? _selected;
   bool _locating = false;
 
+  /// Which pins and cards are shown: people nearby, or my matches.
+  bool _showMatches = false;
+
   /// This phone's live position (only ever shown to you).
   LatLng? _here;
 
@@ -70,10 +73,30 @@ class _MapScreenState extends ConsumerState<MapScreen> {
   void _select(MapPerson p, List<MapPerson> people, {bool fromStrip = false}) {
     setState(() => _selected = p.id);
     _map.move(p.position, _map.camera.zoom < 11 ? 12 : _map.camera.zoom);
-    if (!fromStrip) {
+    if (!fromStrip && _strip.hasClients) {
       _strip.animateToPage(people.indexOf(p), duration: const Duration(milliseconds: 350), curve: Curves.easeOutCubic);
     }
   }
+
+  /// Refresh: a new location reading, then new people/matches.
+  Future<void> _refresh() async {
+    await _refreshHere();
+    ref.invalidate(mapDataProvider);
+  }
+
+  void _toggle(bool matches) {
+    if (matches == _showMatches) return;
+    setState(() {
+      _showMatches = matches;
+      _selected = null;
+    });
+    if (_strip.hasClients) _strip.jumpToPage(0);
+  }
+
+  void _openChat(MapPerson p) => context.push(
+    Routes.chat(p.conversationId!),
+    extra: ChatRouteArgs(matchId: p.matchId!, otherUserId: p.id, otherName: p.name, otherPhoto: p.photo),
+  );
 
   Future<void> _openProfile(MapPerson p) async {
     final controller = ref.read(discoveryControllerProvider.notifier);
@@ -111,34 +134,77 @@ class _MapScreenState extends ConsumerState<MapScreen> {
   @override
   Widget build(BuildContext context) {
     final data = ref.watch(mapDataProvider);
-    return Scaffold(
-      extendBodyBehindAppBar: true,
-      appBar: AppBar(
-        toolbarHeight: 52,
-        backgroundColor: Colors.transparent,
-        title: const Text('People near you'),
-        actions: [
-          IconButton(
-            tooltip: 'Refresh',
-            icon: const Icon(Icons.refresh_rounded),
-            onPressed: () => ref.invalidate(mapDataProvider),
+    final busy = data.isLoading || _locating;
+    final d = data.valueOrNull;
+    final canPop = Navigator.of(context).canPop();
+
+    // Floating controls, always visible on top of the map.
+    final topBar = Positioned(
+      top: 0,
+      left: 0,
+      right: 0,
+      child: SafeArea(
+        bottom: false,
+        child: Padding(
+          padding: const EdgeInsets.fromLTRB(12, 8, 12, 0),
+          child: Row(
+            children: [
+              if (canPop)
+                _MapButton(
+                  icon: Icons.arrow_back_rounded,
+                  tooltip: 'Back',
+                  onTap: () => Navigator.of(context).maybePop(),
+                ),
+              const SizedBox(width: 8),
+              Expanded(
+                child: Center(
+                  child: _ModeSwitch(
+                    matches: _showMatches,
+                    nearbyCount: d?.people.length,
+                    matchCount: d?.matches.length,
+                    onChanged: _toggle,
+                  ),
+                ),
+              ),
+              const SizedBox(width: 8),
+              _MapButton(icon: Icons.refresh_rounded, tooltip: 'Refresh', busy: busy, onTap: busy ? null : _refresh),
+            ],
           ),
-        ],
+        ),
       ),
+    );
+
+    return Scaffold(
       body: data.when(
-        loading: () => const LoadingView(message: 'Finding people near you…'),
-        error: (e, _) => ErrorView(error: e, onRetry: () => ref.invalidate(mapDataProvider)),
+        skipLoadingOnRefresh: true,
+        loading: () => Stack(
+          children: [
+            const LoadingView(message: 'Finding people near you…'),
+            topBar,
+          ],
+        ),
+        error: (e, _) => Stack(
+          children: [
+            ErrorView(error: e, onRetry: _refresh),
+            topBar,
+          ],
+        ),
         data: (d) {
           if (d.me == null) {
-            return EmptyState(
-              icon: Icons.near_me_outlined,
-              title: 'Share your location',
-              message: 'See who’s nearby and how far they are. Your location is rounded and never shown exactly.',
-              actionLabel: _locating ? 'Locating…' : 'Allow location',
-              onAction: _locating ? null : _shareLocation,
+            return Stack(
+              children: [
+                EmptyState(
+                  icon: Icons.near_me_outlined,
+                  title: 'Share your location',
+                  message: 'See who’s nearby and how far they are. Your location is rounded and never shown exactly.',
+                  actionLabel: _locating ? 'Locating…' : 'Allow location',
+                  onAction: _locating ? null : _shareLocation,
+                ),
+                topBar,
+              ],
             );
           }
-          final people = d.people;
+          final people = _showMatches ? d.matches : d.people;
           final me = _here ?? d.me!;
           return Stack(
             children: [
@@ -190,16 +256,20 @@ class _MapScreenState extends ConsumerState<MapScreen> {
                   const RichAttributionWidget(attributions: [TextSourceAttribution('OpenStreetMap contributors')]),
                 ],
               ),
+              topBar,
               Positioned(
                 right: 16,
                 bottom: 124,
                 child: SafeArea(
                   top: false,
-                  child: FloatingActionButton.small(
-                    heroTag: 'locate',
-                    tooltip: 'My location',
-                    onPressed: () => _refreshHere(recenter: true),
-                    child: const Icon(Icons.my_location_rounded),
+                  child: _MapButton(
+                    icon: Icons.my_location_rounded,
+                    tooltip: 'Back to my location',
+                    size: 52,
+                    onTap: () {
+                      _map.move(me, 12);
+                      _refreshHere(recenter: true);
+                    },
                   ),
                 ),
               ),
@@ -210,11 +280,13 @@ class _MapScreenState extends ConsumerState<MapScreen> {
                 child: SafeArea(
                   top: false,
                   child: people.isEmpty
-                      ? const Padding(
-                          padding: EdgeInsets.symmetric(horizontal: AppSpacing.md),
+                      ? Padding(
+                          padding: const EdgeInsets.symmetric(horizontal: AppSpacing.md),
                           child: SoftCard(
                             child: Text(
-                              'No one nearby on the map yet. Try widening your distance in filters.',
+                              _showMatches
+                                  ? 'None of your matches share their distance yet.'
+                                  : 'No one nearby on the map yet. Try widening your distance in filters.',
                               textAlign: TextAlign.center,
                             ),
                           ),
@@ -222,12 +294,16 @@ class _MapScreenState extends ConsumerState<MapScreen> {
                       : SizedBox(
                           height: 92,
                           child: PageView.builder(
+                            key: ValueKey(_showMatches),
                             controller: _strip,
                             itemCount: people.length,
                             onPageChanged: (i) => _select(people[i], people, fromStrip: true),
                             itemBuilder: (context, i) => Padding(
                               padding: const EdgeInsets.symmetric(horizontal: 6),
-                              child: _PersonCard(person: people[i], onOpen: () => _openProfile(people[i])),
+                              child: _PersonCard(
+                                person: people[i],
+                                onOpen: () => people[i].isMatch ? _openChat(people[i]) : _openProfile(people[i]),
+                              ),
                             ),
                           ),
                         ),
@@ -236,6 +312,105 @@ class _MapScreenState extends ConsumerState<MapScreen> {
             ],
           );
         },
+      ),
+    );
+  }
+}
+
+/// Round, solid button that stays readable on any map.
+class _MapButton extends StatelessWidget {
+  const _MapButton({required this.icon, required this.tooltip, required this.onTap, this.size = 46, this.busy = false});
+  final IconData icon;
+  final String tooltip;
+  final VoidCallback? onTap;
+  final double size;
+  final bool busy;
+
+  @override
+  Widget build(BuildContext context) {
+    final scheme = Theme.of(context).colorScheme;
+    return Tooltip(
+      message: tooltip,
+      child: Material(
+        color: scheme.surface,
+        shape: const CircleBorder(),
+        elevation: 4,
+        shadowColor: Colors.black38,
+        child: InkWell(
+          customBorder: const CircleBorder(),
+          onTap: onTap,
+          child: SizedBox(
+            width: size,
+            height: size,
+            child: busy
+                ? Padding(padding: EdgeInsets.all(size * 0.3), child: const CircularProgressIndicator(strokeWidth: 2.4))
+                : Icon(icon, color: scheme.onSurface, size: size * 0.5),
+          ),
+        ),
+      ),
+    );
+  }
+}
+
+/// "Nearby | Matches" switch at the top of the map.
+class _ModeSwitch extends StatelessWidget {
+  const _ModeSwitch({required this.matches, required this.onChanged, this.nearbyCount, this.matchCount});
+  final bool matches;
+  final ValueChanged<bool> onChanged;
+  final int? nearbyCount;
+  final int? matchCount;
+
+  @override
+  Widget build(BuildContext context) {
+    final scheme = Theme.of(context).colorScheme;
+    Widget option(String label, int? count, bool value, IconData icon) {
+      final on = matches == value;
+      return Expanded(
+        child: InkWell(
+          borderRadius: BorderRadius.circular(AppRadius.pill),
+          onTap: () => onChanged(value),
+          child: AnimatedContainer(
+            duration: const Duration(milliseconds: 200),
+            padding: const EdgeInsets.symmetric(vertical: 9),
+            decoration: BoxDecoration(
+              gradient: on ? AppColors.brandGradient : null,
+              borderRadius: BorderRadius.circular(AppRadius.pill),
+            ),
+            child: Row(
+              mainAxisAlignment: MainAxisAlignment.center,
+              children: [
+                Icon(icon, size: 16, color: on ? Colors.white : scheme.onSurfaceVariant),
+                const SizedBox(width: 5),
+                Flexible(
+                  child: Text(
+                    count == null ? label : '$label $count',
+                    overflow: TextOverflow.ellipsis,
+                    style: TextStyle(fontWeight: FontWeight.w700, color: on ? Colors.white : scheme.onSurfaceVariant),
+                  ),
+                ),
+              ],
+            ),
+          ),
+        ),
+      );
+    }
+
+    return Material(
+      color: scheme.surface,
+      elevation: 4,
+      shadowColor: Colors.black38,
+      borderRadius: BorderRadius.circular(AppRadius.pill),
+      child: Padding(
+        padding: const EdgeInsets.all(4),
+        child: ConstrainedBox(
+          constraints: const BoxConstraints(maxWidth: 280),
+          child: Row(
+            children: [
+              option('Nearby', nearbyCount, false, Icons.near_me_rounded),
+              option('Matches', matchCount, true, Icons.favorite_rounded),
+            ],
+          ),
+        ),
       ),
     );
   }
@@ -279,14 +454,29 @@ class _PersonPin extends StatelessWidget {
         alignment: Alignment.bottomCenter,
         child: Column(
           children: [
-            Container(
-              padding: const EdgeInsets.all(3),
-              decoration: BoxDecoration(
-                shape: BoxShape.circle,
-                gradient: AppColors.brandGradient,
-                boxShadow: [BoxShadow(color: AppColors.rose.withValues(alpha: 0.4), blurRadius: 8)],
-              ),
-              child: ProfileAvatar(storagePath: person.photo, size: 46),
+            Stack(
+              clipBehavior: Clip.none,
+              children: [
+                Container(
+                  padding: const EdgeInsets.all(3),
+                  decoration: BoxDecoration(
+                    shape: BoxShape.circle,
+                    gradient: AppColors.brandGradient,
+                    boxShadow: [BoxShadow(color: AppColors.rose.withValues(alpha: 0.4), blurRadius: 8)],
+                  ),
+                  child: ProfileAvatar(storagePath: person.photo, size: 46),
+                ),
+                if (person.isMatch)
+                  Positioned(
+                    right: -4,
+                    bottom: -2,
+                    child: Container(
+                      padding: const EdgeInsets.all(3),
+                      decoration: const BoxDecoration(color: Colors.white, shape: BoxShape.circle),
+                      child: const Icon(Icons.favorite_rounded, size: 13, color: AppColors.rose),
+                    ),
+                  ),
+              ],
             ),
             const Icon(Icons.arrow_drop_down_rounded, color: AppColors.rose, size: 16),
           ],
@@ -345,7 +535,15 @@ class _PersonCard extends ConsumerWidget {
               ],
             ),
           ),
-          const Icon(Icons.chevron_right_rounded),
+          if (person.isMatch)
+            FilledButton.tonalIcon(
+              style: FilledButton.styleFrom(minimumSize: const Size(0, 38)),
+              onPressed: onOpen,
+              icon: const Icon(Icons.chat_bubble_rounded, size: 16),
+              label: const Text('Chat'),
+            )
+          else
+            const Icon(Icons.chevron_right_rounded),
         ],
       ),
     );

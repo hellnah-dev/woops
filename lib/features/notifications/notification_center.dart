@@ -10,6 +10,7 @@ import 'package:supabase_flutter/supabase_flutter.dart';
 import '../../core/router/app_router.dart';
 import '../../core/supabase/supabase_providers.dart';
 import '../../core/theme/app_colors.dart';
+import '../../core/utils/time_format.dart';
 import '../../core/widgets/profile_photo.dart';
 import '../chat/application/chat_controllers.dart';
 import '../chat/domain/chat_models.dart';
@@ -259,6 +260,7 @@ class NotificationCenter extends Notifier<List<ActivityItem>> {
 
   void _onInbox(List<ConversationSummary> list) {
     final current = {for (final c in list) c.conversationId: c.unreadCount};
+    _remind(list);
     if (!_primed) {
       // First load: remember the starting point, don't announce old things.
       _primed = true;
@@ -295,6 +297,62 @@ class NotificationCenter extends Notifier<List<ActivityItem>> {
       }
     }
     _lastUnread = current;
+  }
+
+  /// Gentle chat reminders, each sent once: a match nobody has messaged for a
+  /// day, or a message from them that has waited a day for my reply. Nothing
+  /// older than a week, and at most one banner per check.
+  Future<void> _remind(List<ConversationSummary> list) async {
+    final myId = ref.read(currentUserIdProvider);
+    if (myId == null) return;
+    final now = DateTime.now();
+    bool due(DateTime t) =>
+        now.difference(t) > const Duration(hours: 24) && now.difference(t) < const Duration(days: 7);
+    final candidates = <ActivityItem>[];
+    for (final c in list) {
+      if (!c.hasMessages && due(c.matchedAt)) {
+        candidates.add(
+          ActivityItem(
+            id: 'remind-hi-${c.matchId}',
+            type: ActivityType.message,
+            title: 'Say hi to ${c.otherDisplayName} 👋',
+            body: 'You matched ${shortTimeAgo(c.matchedAt)} ago. A quick hello goes a long way.',
+            at: now,
+            route: Routes.chat(c.conversationId),
+            photo: c.otherPhoto,
+          ),
+        );
+      } else if (c.lastMessageAt != null &&
+          c.lastMessageSenderId != null &&
+          c.lastMessageSenderId != myId &&
+          due(c.lastMessageAt!)) {
+        candidates.add(
+          ActivityItem(
+            id: 'remind-reply-${c.conversationId}-${c.lastMessageAt!.millisecondsSinceEpoch}',
+            type: ActivityType.message,
+            title: '${c.otherDisplayName} is waiting for your reply',
+            body: c.lastMessageBody ?? 'Pick up where you left off.',
+            at: now,
+            route: Routes.chat(c.conversationId),
+            photo: c.otherPhoto,
+          ),
+        );
+      }
+    }
+    if (candidates.isEmpty) return;
+    try {
+      final prefs = await SharedPreferences.getInstance();
+      final key = 'reminded_$myId';
+      final sent = (prefs.getStringList(key) ?? const []).toSet();
+      var banner = true;
+      for (final item in candidates.where((i) => !sent.contains(i.id))) {
+        add(item, banner: banner);
+        banner = false;
+        sent.add(item.id);
+      }
+      // Keep the list small: only recent reminder ids matter.
+      await prefs.setStringList(key, sent.toList().reversed.take(200).toList());
+    } catch (_) {}
   }
 
   /// Adds an item and, by default, slides a banner in at the top.

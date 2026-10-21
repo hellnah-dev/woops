@@ -16,8 +16,7 @@ import '../../../core/widgets/state_views.dart';
 import '../../safety/presentation/safety_actions.dart';
 import '../../notifications/notification_center.dart';
 import '../application/chat_controllers.dart';
-import '../data/chat_repository.dart';
-import '../data/local_chat_store.dart';
+import 'conversation_actions.dart';
 import '../domain/chat_models.dart';
 
 /// Resolves route arguments (e.g. when opened from a push notification, only
@@ -164,24 +163,17 @@ class _ChatViewState extends ConsumerState<_ChatView> {
     switch (action) {
       case 'profile':
         _openProfile();
+      case 'delete':
+        await confirmDeleteHistory(context, ref, conversationId: widget.conversationId, name: name);
       case 'unmatch':
-        final ok = await confirmAction(
+        final ok = await confirmUnmatch(
           context,
-          icon: Icons.heart_broken_outlined,
-          destructive: true,
-          title: 'Unmatch $name?',
-          message: 'This removes the match, and the chat is deleted from both phones. It can’t be undone.',
-          confirmLabel: 'Unmatch',
+          ref,
+          matchId: widget.args.matchId,
+          conversationId: widget.conversationId,
+          name: name,
         );
-        if (!ok) return;
-        try {
-          await ref.read(chatRepositoryProvider).unmatch(widget.args.matchId);
-          await ref.read(localChatStoreProvider).deleteConversation(widget.conversationId);
-          await ref.read(inboxProvider.notifier).refresh();
-          if (mounted) context.pop();
-        } catch (e) {
-          if (mounted) showSnack(context, e);
-        }
+        if (ok && mounted) context.pop();
       case 'block':
         if (await confirmAndBlock(context, ref, userId: widget.args.otherUserId, name: name) && mounted) context.pop();
       case 'report':
@@ -260,6 +252,7 @@ class _ChatViewState extends ConsumerState<_ChatView> {
             onSelected: _menu,
             itemBuilder: (_) => [
               const PopupMenuItem(value: 'profile', child: Text('View profile')),
+              const PopupMenuItem(value: 'delete', child: Text('Delete chat history')),
               const PopupMenuItem(value: 'unmatch', child: Text('Unmatch')),
               const PopupMenuItem(value: 'block', child: Text('Block')),
               const PopupMenuItem(value: 'report', child: Text('Report')),

@@ -10,6 +10,7 @@ import '../../../core/widgets/state_views.dart';
 import '../../ads/ad_widgets.dart';
 import '../../chat/application/chat_controllers.dart';
 import '../../chat/domain/chat_models.dart';
+import '../../chat/presentation/conversation_actions.dart';
 
 void openConversation(BuildContext context, ConversationSummary c) {
   context.push(
@@ -107,18 +108,20 @@ class MatchesScreen extends ConsumerWidget {
   );
 }
 
-class _MatchTile extends StatelessWidget {
+class _MatchTile extends ConsumerWidget {
   const _MatchTile({required this.summary, required this.isNew});
   final ConversationSummary summary;
   final bool isNew;
 
   @override
-  Widget build(BuildContext context) {
+  Widget build(BuildContext context, WidgetRef ref) {
     return Semantics(
       button: true,
       label: 'Chat with ${summary.otherDisplayName}',
+      hint: 'Long press for more options',
       child: GestureDetector(
         onTap: () => openConversation(context, summary),
+        onLongPress: () => showConversationActions(context, ref, summary),
         child: Container(
           padding: isNew ? const EdgeInsets.all(2.5) : EdgeInsets.zero,
           decoration: BoxDecoration(

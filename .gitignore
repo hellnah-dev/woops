@@ -59,3 +59,9 @@ supabase/functions/.env
 
 # Generated database setup file (rebuild with supabase/make_setup_sql.sh)
 supabase/setup_all.sql
+
+# Firebase server key (never commit)
+*service-account*.json
+*firebase-adminsdk*.json
+supabase/.push_webhook_secret
+supabase/.setup_push_webhooks.local.sql
