@@ -15,6 +15,7 @@ import '../../ads/ad_widgets.dart';
 import '../../ads/ads_config.dart';
 import '../../ads/ads_service.dart';
 import '../../ads/rewarded_likes.dart';
+import '../../moments/presentation/moments_ui.dart';
 import '../../notifications/activity_screen.dart';
 import '../../profile/application/profile_providers.dart';
 import '../../profile/domain/profile_models.dart';
@@ -162,121 +163,134 @@ class _DiscoverScreenState extends ConsumerState<DiscoverScreen> {
         ],
       ),
       body: SafeArea(
-        child: Builder(
-          builder: (context) {
-            // Incomplete profiles see what's missing (and why) instead of cards.
-            if (me != null && !me.isReadyToDate) return ProfileGate(profile: me);
-            if (state.queue.isEmpty) {
-              if (state.isLoading) return const LoadingView(message: 'Finding people for you…');
-              if (state.error != null) {
-                return ErrorView(
-                  error: state.error!,
-                  onRetry: () => ref.read(discoveryControllerProvider.notifier).load(reset: true),
-                );
-              }
-              return EmptyState(
-                icon: Icons.travel_explore_rounded,
-                title: 'You’ve seen everyone for now',
-                message: 'New people join every day. Check back soon, or pull in more people by widening your filters.',
-                actionLabel: 'Adjust filters',
-                onAction: () => showFiltersSheet(context),
-              );
-            }
+        child: Column(
+          children: [
+            // Your matches' 24-hour moments (only once you can date).
+            if (me != null && me.isReadyToDate) const MomentsRow(),
+            Expanded(
+              child: Builder(
+                builder: (context) {
+                  // Incomplete profiles see what's missing (and why) instead of cards.
+                  if (me != null && !me.isReadyToDate) return ProfileGate(profile: me);
+                  if (state.queue.isEmpty) {
+                    if (state.isLoading) return const LoadingView(message: 'Finding people for you…');
+                    if (state.error != null) {
+                      return ErrorView(
+                        error: state.error!,
+                        onRetry: () => ref.read(discoveryControllerProvider.notifier).load(reset: true),
+                      );
+                    }
+                    return EmptyState(
+                      icon: Icons.travel_explore_rounded,
+                      title: 'You’ve seen everyone for now',
+                      message:
+                          'New people join every day. Check back soon, or pull in more people by widening your filters.',
+                      actionLabel: 'Adjust filters',
+                      onAction: () => showFiltersSheet(context),
+                    );
+                  }
 
-            final visible = state.queue.take(2).toList();
-            return Column(
-              children: [
-                if (me != null && me.completeness < 1) _CompleteNudge(percent: me.completenessPercent),
-                Expanded(
-                  child: Padding(
-                    padding: const EdgeInsets.fromLTRB(AppSpacing.md, AppSpacing.sm, AppSpacing.md, 0),
-                    child: _showAd && _deckAd != null
-                        ? DeckAdCard(ad: _deckAd!, onContinue: _dismissAd)
-                        : Stack(
-                            children: [
-                              // Render back-to-front so the current card is on top.
-                              // The same widget tree for both cards, so the next
-                              // card is promoted (scaled up) instead of rebuilt.
-                              for (final card in visible.reversed)
-                                Positioned.fill(
-                                  key: ValueKey(card.id),
-                                  // The next card grows from 95% to full size as
-                                  // the top card is dragged away, so promotion
-                                  // never jumps.
-                                  child: ValueListenableBuilder<double>(
-                                    valueListenable: _dragProgress,
-                                    builder: (context, p, child) => Transform.scale(
-                                      scale: card.id == current.id ? 1 : 0.95 + 0.05 * p.abs(),
-                                      child: child,
-                                    ),
-                                    child: IgnorePointer(
-                                      ignoring: card.id != current!.id,
-                                      child: SwipeableCard(
-                                        key: _keyFor(card.id),
-                                        enabled: card.id == current.id,
-                                        progress: card.id == current.id ? _dragProgress : null,
-                                        enterFrom: card.id == _rewindId
-                                            ? Offset(-MediaQuery.sizeOf(context).width * 1.4, 0)
-                                            : null,
-                                        onSwiped: (a) => _onSwiped(card, a),
-                                        child: ProfileCardView(
-                                          card: card,
-                                          onInfo: card.id == current.id ? () => _openDetails(card) : null,
+                  final visible = state.queue.take(2).toList();
+                  return Column(
+                    children: [
+                      if (me != null && me.completeness < 1) _CompleteNudge(percent: me.completenessPercent),
+                      Expanded(
+                        child: Padding(
+                          padding: const EdgeInsets.fromLTRB(AppSpacing.md, AppSpacing.sm, AppSpacing.md, 0),
+                          child: _showAd && _deckAd != null
+                              ? DeckAdCard(ad: _deckAd!, onContinue: _dismissAd)
+                              : Stack(
+                                  children: [
+                                    // Render back-to-front so the current card is on top.
+                                    // The same widget tree for both cards, so the next
+                                    // card is promoted (scaled up) instead of rebuilt.
+                                    for (final card in visible.reversed)
+                                      Positioned.fill(
+                                        key: ValueKey(card.id),
+                                        // The next card grows from 95% to full size as
+                                        // the top card is dragged away, so promotion
+                                        // never jumps.
+                                        child: ValueListenableBuilder<double>(
+                                          valueListenable: _dragProgress,
+                                          builder: (context, p, child) => Transform.scale(
+                                            scale: card.id == current.id ? 1 : 0.95 + 0.05 * p.abs(),
+                                            child: child,
+                                          ),
+                                          child: IgnorePointer(
+                                            ignoring: card.id != current!.id,
+                                            child: SwipeableCard(
+                                              key: _keyFor(card.id),
+                                              enabled: card.id == current.id,
+                                              progress: card.id == current.id ? _dragProgress : null,
+                                              enterFrom: card.id == _rewindId
+                                                  ? Offset(-MediaQuery.sizeOf(context).width * 1.4, 0)
+                                                  : null,
+                                              onSwiped: (a) => _onSwiped(card, a),
+                                              // Own layer: dragging moves the drawn card
+                                              // instead of repainting photo and labels.
+                                              child: RepaintBoundary(
+                                                child: ProfileCardView(
+                                                  card: card,
+                                                  onInfo: card.id == current.id ? () => _openDetails(card) : null,
+                                                ),
+                                              ),
+                                            ),
+                                          ),
                                         ),
                                       ),
-                                    ),
-                                  ),
+                                  ],
                                 ),
+                        ),
+                      ),
+                      if (!(_showAd && _deckAd != null))
+                        Padding(
+                          padding: const EdgeInsets.symmetric(vertical: AppSpacing.md),
+                          child: Row(
+                            mainAxisAlignment: MainAxisAlignment.spaceEvenly,
+                            children: [
+                              RoundActionButton(
+                                tooltip: 'Undo last pass',
+                                icon: Icons.replay_rounded,
+                                color: AppColors.undo,
+                                size: 52,
+                                onPressed: state.canUndo ? _undo : null,
+                              ),
+                              _GrowWithDrag(
+                                progress: _dragProgress,
+                                towards: -1,
+                                child: RoundActionButton(
+                                  tooltip: 'Pass',
+                                  icon: Icons.close_rounded,
+                                  color: AppColors.pass,
+                                  size: 68,
+                                  onPressed: () => _keyFor(current!.id).currentState?.swipe(SwipeAction.pass),
+                                ),
+                              ),
+                              _GrowWithDrag(
+                                progress: _dragProgress,
+                                towards: 1,
+                                child: HeartButton(
+                                  tooltip: 'Like',
+                                  size: 78,
+                                  onPressed: () => _keyFor(current!.id).currentState?.swipe(SwipeAction.like),
+                                ),
+                              ),
+                              RoundActionButton(
+                                tooltip: 'View profile',
+                                icon: Icons.info_outline_rounded,
+                                color: AppColors.violet,
+                                size: 52,
+                                onPressed: () => _openDetails(current!),
+                              ),
                             ],
                           ),
-                  ),
-                ),
-                if (!(_showAd && _deckAd != null))
-                  Padding(
-                    padding: const EdgeInsets.symmetric(vertical: AppSpacing.md),
-                    child: Row(
-                      mainAxisAlignment: MainAxisAlignment.spaceEvenly,
-                      children: [
-                        RoundActionButton(
-                          tooltip: 'Undo last pass',
-                          icon: Icons.replay_rounded,
-                          color: AppColors.undo,
-                          size: 52,
-                          onPressed: state.canUndo ? _undo : null,
                         ),
-                        _GrowWithDrag(
-                          progress: _dragProgress,
-                          towards: -1,
-                          child: RoundActionButton(
-                            tooltip: 'Pass',
-                            icon: Icons.close_rounded,
-                            color: AppColors.pass,
-                            size: 68,
-                            onPressed: () => _keyFor(current!.id).currentState?.swipe(SwipeAction.pass),
-                          ),
-                        ),
-                        _GrowWithDrag(
-                          progress: _dragProgress,
-                          towards: 1,
-                          child: HeartButton(
-                            tooltip: 'Like',
-                            size: 78,
-                            onPressed: () => _keyFor(current!.id).currentState?.swipe(SwipeAction.like),
-                          ),
-                        ),
-                        RoundActionButton(
-                          tooltip: 'View profile',
-                          icon: Icons.info_outline_rounded,
-                          color: AppColors.violet,
-                          size: 52,
-                          onPressed: () => _openDetails(current!),
-                        ),
-                      ],
-                    ),
-                  ),
-              ],
-            );
-          },
+                    ],
+                  );
+                },
+              ),
+            ),
+          ],
         ),
       ),
     );

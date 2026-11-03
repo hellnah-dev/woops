@@ -11,7 +11,7 @@ export async function render(view, _params, rerender) {
   const photos = await signedUrls('profile-photos', rows.flatMap((r) => r.photos)).catch(() => ({}));
 
   view.innerHTML = `
-    <div class="page-head"><div><h1>Verifications</h1>
+    <div class="page-head"><div><h1>Selfie checks</h1>
       <p class="muted">Approve only if the selfie clearly shows the same person as the profile photos, doing the ✌️ pose, and they look 18+.
       Click any photo to see it full screen. Selfies are deleted after you decide, and automatically after 7 days.</p></div></div>
     ${rows.length ? rows.map((r) => `

@@ -1,4 +1,5 @@
 import 'package:flutter/material.dart';
+import 'package:flutter/services.dart';
 
 import 'app_colors.dart';
 
@@ -37,13 +38,18 @@ class AppTheme {
       // Smooth, consistent screen transitions on both platforms.
       pageTransitionsTheme: const PageTransitionsTheme(
         builders: {
-          TargetPlatform.android: FadeForwardsPageTransitionsBuilder(),
+          // Android's own transition: smooth on every device.
+          TargetPlatform.android: ZoomPageTransitionsBuilder(),
           TargetPlatform.iOS: CupertinoPageTransitionsBuilder(),
         },
       ),
-      splashFactory: InkSparkle.splashFactory,
+      // InkRipple, not InkSparkle: the sparkle shader janks the first tap on many Android phones.
+      splashFactory: InkRipple.splashFactory,
       textTheme: text,
       appBarTheme: AppBarTheme(
+        // Explicit, because glass (transparent) bars would otherwise make
+        // Android guess a dark background and show white, unreadable icons.
+        systemOverlayStyle: isDark ? SystemUiOverlayStyle.light : SystemUiOverlayStyle.dark,
         backgroundColor: scheme.surface,
         foregroundColor: scheme.onSurface,
         elevation: 0,
@@ -99,24 +105,29 @@ class AppTheme {
         labelStyle: text.bodyMedium,
         padding: const EdgeInsets.symmetric(horizontal: 10, vertical: 6),
       ),
+      // Glass cards: translucent with a bright edge.
       cardTheme: CardThemeData(
-        color: isDark ? const Color(0xFF2A1724) : Colors.white,
-        shadowColor: AppColors.rose.withValues(alpha: 0.18),
-        elevation: isDark ? 0 : 2,
+        color: isDark ? const Color(0xFF2A1A2A).withValues(alpha: 0.72) : Colors.white.withValues(alpha: 0.78),
+        surfaceTintColor: Colors.transparent,
+        shadowColor: AppColors.rose.withValues(alpha: 0.16),
+        elevation: isDark ? 0 : 1,
         shape: RoundedRectangleBorder(
           borderRadius: BorderRadius.circular(AppRadius.lg),
-          side: BorderSide(color: AppColors.rose.withValues(alpha: isDark ? 0.25 : 0.12)),
+          side: BorderSide(color: Colors.white.withValues(alpha: isDark ? 0.12 : 0.85)),
         ),
         margin: EdgeInsets.zero,
       ),
       dialogTheme: DialogThemeData(shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(AppRadius.lg))),
-      bottomSheetTheme: const BottomSheetThemeData(
+      bottomSheetTheme: BottomSheetThemeData(
         showDragHandle: true,
-        shape: RoundedRectangleBorder(borderRadius: BorderRadius.vertical(top: Radius.circular(AppRadius.lg))),
+        backgroundColor: isDark ? const Color(0xF2241320) : const Color(0xF5FFF7FA),
+        surfaceTintColor: Colors.transparent,
+        shape: const RoundedRectangleBorder(borderRadius: BorderRadius.vertical(top: Radius.circular(AppRadius.lg))),
       ),
       navigationBarTheme: NavigationBarThemeData(
         height: 68,
-        backgroundColor: isDark ? const Color(0xFF231420) : Colors.white,
+        backgroundColor: Colors.transparent, // the glass pane in HomeShell shows through
+        surfaceTintColor: Colors.transparent,
         indicatorColor: scheme.primary.withValues(alpha: 0.16),
         shadowColor: AppColors.rose.withValues(alpha: 0.2),
         elevation: 3,

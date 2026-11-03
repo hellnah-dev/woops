@@ -6,6 +6,7 @@ import '../../../core/router/app_router.dart';
 import '../../chat/application/chat_controllers.dart';
 import '../../profile/application/profile_providers.dart';
 import '../../profile/domain/profile_models.dart';
+import '../../support/support_prompt.dart';
 import '../data/discovery_repository.dart';
 import 'match_overlay.dart';
 
@@ -22,7 +23,8 @@ Future<void> celebrateMatch(BuildContext context, WidgetRef ref, SwipeResult res
     theirName: card.displayName,
   );
   if (message == true && result.conversationId != null && result.matchId != null && context.mounted) {
-    context.push(
+    // Ask after they've said hi, not in the middle of it.
+    await context.push(
       Routes.chat(result.conversationId!),
       extra: ChatRouteArgs(
         matchId: result.matchId!,
@@ -32,4 +34,6 @@ Future<void> celebrateMatch(BuildContext context, WidgetRef ref, SwipeResult res
       ),
     );
   }
+  // A first match is a happy moment to ask for a little help (once).
+  await maybeAskForSupport(SupportMoment.firstMatch);
 }

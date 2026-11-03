@@ -344,8 +344,10 @@ class NotificationCenter extends Notifier<List<ActivityItem>> {
       final prefs = await SharedPreferences.getInstance();
       final key = 'reminded_$myId';
       final sent = (prefs.getStringList(key) ?? const []).toSet();
+      final fresh = candidates.where((i) => !sent.contains(i.id)).toList();
+      if (fresh.isEmpty) return; // nothing new: no disk write
       var banner = true;
-      for (final item in candidates.where((i) => !sent.contains(i.id))) {
+      for (final item in fresh) {
         add(item, banner: banner);
         banner = false;
         sent.add(item.id);

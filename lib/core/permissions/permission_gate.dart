@@ -75,6 +75,8 @@ class PermissionGate {
   static Future<bool?> _sheet(BuildContext context, AppPermission p, {required bool blocked}) {
     final theme = Theme.of(context);
     return showModalBottomSheet<bool>(
+      // Over the whole screen, never under the glass tab bar.
+      useRootNavigator: true,
       context: context,
       builder: (context) => SafeArea(
         child: Padding(

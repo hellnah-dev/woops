@@ -191,8 +191,8 @@ class ProfileRepository {
 
   /// Someone else's profile (only works for matches and people who liked you).
   Future<ProfileCard?> fetchPublicProfile(String userId) async {
-    final row = await _client.from('public_profiles').select().eq('id', userId).maybeSingle();
-    return row == null ? null : ProfileCard.fromJson(row);
+    final rows = await _client.rpc('get_public_profile', params: {'p_user': userId}) as List;
+    return rows.isEmpty ? null : ProfileCard.fromJson(Map<String, dynamic>.from(rows.first as Map));
   }
 
   Future<DiscoveryPreferences> fetchPreferences() async {

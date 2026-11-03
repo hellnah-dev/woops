@@ -40,6 +40,8 @@ class _PhotoGridEditorState extends ConsumerState<PhotoGridEditor> {
   /// Source sheet → permission → pick → crop. Returns null if cancelled.
   Future<XFile?> _pickAndCrop() async {
     final source = await showModalBottomSheet<ImageSource>(
+      // Over the whole screen, never under the glass tab bar.
+      useRootNavigator: true,
       context: context,
       builder: (context) => SafeArea(
         child: Column(
@@ -197,6 +199,8 @@ class _PhotoGridEditorState extends ConsumerState<PhotoGridEditor> {
   Future<void> _options(ProfilePhotoRecord photo, List<ProfilePhotoRecord> photos) async {
     final index = photos.indexOf(photo);
     final action = await showModalBottomSheet<String>(
+      // Over the whole screen, never under the glass tab bar.
+      useRootNavigator: true,
       context: context,
       builder: (context) => SafeArea(
         child: Column(

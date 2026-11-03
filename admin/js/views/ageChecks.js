@@ -9,7 +9,7 @@ export async function render(view, _params, rerender) {
   const photos = await signedUrls('profile-photos', rows.map((r) => r.photo).filter(Boolean)).catch(() => ({}));
 
   view.innerHTML = `
-    <div class="page-head"><div><h1>ID document review</h1>
+    <div class="page-head"><div><h1>ID documents</h1>
       <p class="muted">Approve only if the document looks genuine, its photo matches the profile, and the date of birth
       matches the profile and meets the country's minimum age. Click a photo to see it full screen. The file is deleted after you decide, and automatically after 7 days.</p></div></div>
     ${rows.length ? rows.map((r) => `
@@ -19,7 +19,7 @@ export async function render(view, _params, rerender) {
           <span>${flag(r.country_code)}</span>
           <span>${esc(r.document_type)}</span>
           <span class="muted small">Profile DOB ${esc(r.birthdate)} · age ${esc(r.age)} · minimum ${esc(r.min_age)}</span>
-          ${r.age < r.min_age ? '<span class="badge" style="background:#d33">UNDER MINIMUM</span>' : ''}
+          ${r.age < r.min_age ? '<span class="pill rejected">Under the minimum age</span>' : ''}
           <span class="muted small">sent ${esc(fmtDate(r.created_at))}</span>
           <span class="spacer" style="flex:1"></span>
           <button class="btn danger small" data-reject="${esc(r.id)}">Reject</button>

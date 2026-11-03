@@ -17,6 +17,8 @@ import '../application/discovery_controller.dart';
 /// Opens the discovery preferences editor. Saves to the server and reloads
 /// the feed when the user taps "Apply".
 Future<void> showFiltersSheet(BuildContext context) => showModalBottomSheet<void>(
+  // Over the whole screen, never under the glass tab bar.
+  useRootNavigator: true,
   context: context,
   isScrollControlled: true,
   useSafeArea: true,

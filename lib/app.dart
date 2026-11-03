@@ -22,7 +22,6 @@ class WoopsApp extends ConsumerWidget {
       themeMode: ThemeMode.system,
       scaffoldMessengerKey: scaffoldMessengerKey,
       routerConfig: router,
-      scrollBehavior: const _SmoothScrollBehavior(),
       builder: (context, child) => IntroOverlay(child: child ?? const SizedBox.shrink()),
       // System widgets (date pickers, dialogs, text selection) follow the
       // phone's language, and right-to-left languages mirror the layout.
@@ -31,13 +30,4 @@ class WoopsApp extends ConsumerWidget {
       supportedLocales: kMaterialSupportedLanguages.map(Locale.new),
     );
   }
-}
-
-/// iOS-style bouncy scrolling everywhere, for a softer feel.
-class _SmoothScrollBehavior extends MaterialScrollBehavior {
-  const _SmoothScrollBehavior();
-
-  @override
-  ScrollPhysics getScrollPhysics(BuildContext context) =>
-      const BouncingScrollPhysics(parent: AlwaysScrollableScrollPhysics());
 }

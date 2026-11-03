@@ -5,6 +5,7 @@ import '../../../core/i18n/countries.dart';
 import '../../../core/supabase/supabase_providers.dart';
 import '../../../core/i18n/units.dart';
 import '../../../core/theme/app_colors.dart';
+import '../../../core/widgets/photo_viewer.dart';
 import '../../../core/widgets/profile_photo.dart';
 import '../../profile/domain/profile_models.dart';
 
@@ -87,6 +88,19 @@ class _ProfileCardViewState extends ConsumerState<ProfileCardView> {
                             ),
                           ),
                       ],
+                    ),
+                  ),
+                // Tapping the photo flips through them; this opens it full screen.
+                if (photos.isNotEmpty)
+                  Positioned(
+                    top: photos.length > 1 ? 22 : 10,
+                    right: 6,
+                    child: IconButton(
+                      key: const Key('card-fullscreen'),
+                      tooltip: 'View photo full screen',
+                      onPressed: () => showPhotoViewer(context, photos: photos, initialIndex: _photo),
+                      style: IconButton.styleFrom(backgroundColor: Colors.black26),
+                      icon: const Icon(Icons.open_in_full_rounded, color: Colors.white, size: 20),
                     ),
                   ),
                 Positioned(

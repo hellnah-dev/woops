@@ -8,6 +8,7 @@ import '../../core/i18n/units.dart';
 import '../../core/permissions/permission_gate.dart';
 import '../../core/router/app_router.dart';
 import '../../core/theme/app_colors.dart';
+import '../../core/widgets/glass.dart';
 import '../../core/widgets/love_ui.dart';
 import '../../core/widgets/profile_photo.dart';
 import '../../core/widgets/state_views.dart';
@@ -331,20 +332,26 @@ class _MapButton extends StatelessWidget {
     final scheme = Theme.of(context).colorScheme;
     return Tooltip(
       message: tooltip,
-      child: Material(
-        color: scheme.surface,
-        shape: const CircleBorder(),
-        elevation: 4,
-        shadowColor: Colors.black38,
-        child: InkWell(
-          customBorder: const CircleBorder(),
-          onTap: onTap,
-          child: SizedBox(
-            width: size,
-            height: size,
-            child: busy
-                ? Padding(padding: EdgeInsets.all(size * 0.3), child: const CircularProgressIndicator(strokeWidth: 2.4))
-                : Icon(icon, color: scheme.onSurface, size: size * 0.5),
+      child: GlassSurface(
+        blur: 14,
+        strength: 1.25,
+        borderRadius: BorderRadius.circular(size),
+        child: Material(
+          type: MaterialType.transparency,
+          shape: const CircleBorder(),
+          child: InkWell(
+            customBorder: const CircleBorder(),
+            onTap: onTap,
+            child: SizedBox(
+              width: size,
+              height: size,
+              child: busy
+                  ? Padding(
+                      padding: EdgeInsets.all(size * 0.3),
+                      child: const CircularProgressIndicator(strokeWidth: 2.4),
+                    )
+                  : Icon(icon, color: scheme.onSurface, size: size * 0.5),
+            ),
           ),
         ),
       ),
@@ -395,10 +402,9 @@ class _ModeSwitch extends StatelessWidget {
       );
     }
 
-    return Material(
-      color: scheme.surface,
-      elevation: 4,
-      shadowColor: Colors.black38,
+    return GlassSurface(
+      blur: 14,
+      strength: 1.25,
       borderRadius: BorderRadius.circular(AppRadius.pill),
       child: Padding(
         padding: const EdgeInsets.all(4),

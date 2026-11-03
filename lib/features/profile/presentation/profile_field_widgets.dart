@@ -48,6 +48,8 @@ class PromptsEditor extends StatelessWidget {
   Future<void> _edit(BuildContext context, {int? index}) async {
     final used = prompts.map((p) => p.prompt).toSet();
     final result = await showModalBottomSheet<ProfilePrompt>(
+      // Over the whole screen, never under the glass tab bar.
+      useRootNavigator: true,
       context: context,
       isScrollControlled: true,
       builder: (context) => _PromptSheet(

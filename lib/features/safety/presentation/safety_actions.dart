@@ -52,6 +52,8 @@ Future<bool> showReportSheet(
   String? messageBody,
 }) async {
   final sent = await showModalBottomSheet<bool>(
+    // Over the whole screen, never under the glass tab bar.
+    useRootNavigator: true,
     context: context,
     isScrollControlled: true,
     useSafeArea: true,

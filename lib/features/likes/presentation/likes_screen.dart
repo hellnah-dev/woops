@@ -92,10 +92,11 @@ class LikesScreen extends ConsumerWidget {
                       ),
                     ),
                     // One paced "Sponsored" card below the likes (hidden when pacing says no).
-                    const SliverPadding(
-                      padding: EdgeInsets.fromLTRB(AppSpacing.md, 0, AppSpacing.md, AppSpacing.lg),
-                      sliver: SliverToBoxAdapter(child: NativeAdCard()),
+                    const SliverToBoxAdapter(
+                      child: NativeAdCard(padding: EdgeInsets.fromLTRB(AppSpacing.md, 0, AppSpacing.md, AppSpacing.lg)),
                     ),
+                    // Room below for the glass tab bar.
+                    SliverToBoxAdapter(child: SizedBox(height: MediaQuery.paddingOf(context).bottom)),
                   ],
                 ),
         ),

@@ -67,6 +67,8 @@ Future<bool> confirmUnmatch(
 Future<void> showConversationActions(BuildContext context, WidgetRef ref, ConversationSummary c) async {
   final name = c.otherDisplayName;
   final action = await showModalBottomSheet<String>(
+    // Over the whole screen, never under the glass tab bar.
+    useRootNavigator: true,
     context: context,
     builder: (context) => SafeArea(
       child: Column(

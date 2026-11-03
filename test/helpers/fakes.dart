@@ -61,8 +61,28 @@ class FakeDiscoveryRepository implements DiscoveryRepository {
   Future<List<ProfileCard>> fetchLikesReceived({int limit = 30, int offset = 0}) async => const [];
 }
 
+class FakeTypingChannel implements TypingChannel {
+  final other = StreamController<bool>.broadcast();
+  final sent = <bool>[];
+  bool closed = false;
+
+  @override
+  Stream<bool> get otherTyping => other.stream;
+
+  @override
+  Future<void> send(bool typing) async => sent.add(typing);
+
+  @override
+  Future<void> close() async => closed = true;
+}
+
 class FakeChatRepository implements ChatRepository {
   FakeChatRepository({this.myId = 'me'});
+
+  final typing = FakeTypingChannel();
+
+  @override
+  TypingChannel typingChannel(String conversationId) => typing;
 
   final String myId;
   final incoming = StreamController<ChatMessage>.broadcast();
@@ -94,6 +114,7 @@ class FakeChatRepository implements ChatRepository {
   /// What actually went over the wire (ciphertext when encrypted).
   final sentBodies = <String>[];
   final sentEncrypted = <bool>[];
+  final sentKinds = <MessageKind>[];
   final chatKeys = <String, String>{};
   final media = <String, Uint8List>{};
   int mediaUsed = 0;
@@ -115,6 +136,7 @@ class FakeChatRepository implements ChatRepository {
     sentClientIds.add(clientId);
     sentBodies.add(body);
     sentEncrypted.add(encrypted);
+    sentKinds.add(kind);
     return ChatMessage(
       id: 'srv-$clientId',
       conversationId: conversationId,

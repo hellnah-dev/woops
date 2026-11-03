@@ -94,6 +94,20 @@ async function buildPushes(db: SupabaseClient, payload: WebhookPayload): Promise
 
   if (payload.table === "messages") {
     if (r.kind === "system") return [];
+    // End-to-end encrypted messages can't be read here: show a neutral text.
+    const encrypted = (r.metadata as Record<string, unknown> | undefined)?.e2e === true;
+    let reaction = "";
+    if (r.kind === "reaction") {
+      // Removing a reaction is sent unencrypted with an empty emoji: no push.
+      if (!encrypted) {
+        try {
+          reaction = String(JSON.parse(String(r.body ?? "{}")).e ?? "");
+        } catch {
+          return [];
+        }
+        if (!reaction) return [];
+      }
+    }
     const senderId = r.sender_id as string;
     const { data: members } = await db
       .from("conversation_members")
@@ -101,9 +115,15 @@ async function buildPushes(db: SupabaseClient, payload: WebhookPayload): Promise
       .eq("conversation_id", r.conversation_id as string)
       .neq("user_id", senderId);
     const name = await displayName(db, senderId);
-    // End-to-end encrypted messages can't be read here: show a neutral text.
-    const encrypted = (r.metadata as Record<string, unknown> | undefined)?.e2e === true;
-    const body = r.kind === "image" ? "Sent you a photo 📷" : encrypted ? "New message 🔒" : truncate(String(r.body ?? ""));
+    const body = r.kind === "reaction"
+      ? (reaction ? `Reacted ${reaction} to your message` : "Reacted to your message")
+      : r.kind === "image"
+      ? "Sent you a photo 📷 (view once)"
+      : r.kind === "video"
+      ? "Sent you a video 🎥 (view once)"
+      : encrypted
+      ? "New message 🔒"
+      : truncate(String(r.body ?? ""));
     return (members ?? []).map((m) => ({
       userId: m.user_id as string,
       pref: "new_messages" as const,

@@ -95,8 +95,12 @@ class _PermissionsScreenState extends ConsumerState<PermissionsScreen> {
   @override
   Widget build(BuildContext context) {
     final theme = Theme.of(context);
+    // Back (button or gesture) works like "Maybe later", so nobody gets stuck here.
     return PopScope(
       canPop: false,
+      onPopInvokedWithResult: (didPop, _) {
+        if (!didPop) _finish();
+      },
       child: Scaffold(
         body: DreamyBackground(
           child: SafeArea(

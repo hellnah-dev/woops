@@ -25,6 +25,11 @@ enable_signup = true
 enable_signup = true
 enable_confirmations = true
 
+# Branded email templates live in supabase/templates/ (tools/make_email_templates.py).
+# They need a custom SMTP sender (Supabase blocks custom templates on its free
+# built-in email). To switch them on later, add [auth.email.smtp] and
+# [auth.email.template.*] sections here and run `supabase config push`.
+
 # The app calls this with the user's JWT.
 [functions.delete-account]
 verify_jwt = true

@@ -24,7 +24,8 @@ insert into auth.users (id, email) values
 set role anon;
 select tests.login(null);
 select tests.throws('select * from public.profiles', '%permission denied%', 'anon cannot read profiles');
-select tests.throws('select * from public.public_profiles', '%permission denied%', 'anon cannot read public_profiles');
+select tests.throws($q$select * from public.get_public_profile('aaaaaaaa-0000-0000-0000-000000000001')$q$, '%permission denied%',
+                    'anon cannot look up profiles');
 select tests.throws($q$select public.swipe('bbbbbbbb-0000-0000-0000-000000000002', 'like')$q$,
                     '%permission denied%', 'anon cannot call swipe()');
 reset role;
@@ -114,8 +115,8 @@ update public.privacy_settings set discoverable = false where user_id = :A;  -- 
 select tests.throws($q$insert into public.entitlements (user_id, entitlement) values ('bbbbbbbb-0000-0000-0000-000000000002', 'premium')$q$,
                     '%permission denied%', 'cannot grant yourself premium');
 select tests.ok(not public.is_premium(), 'is_premium() is false without a server-side entitlement');
-select tests.ok(not exists (select 1 from public.public_profiles where id = :A),
-                'cannot look up a stranger via public_profiles');
+select tests.ok(not exists (select 1 from public.get_public_profile(:A)),
+                'cannot look up a stranger''s profile');
 
 select tests.login(:A);
 select tests.ok((select discoverable from public.privacy_settings), 'another user could not change my privacy settings');
@@ -170,7 +171,7 @@ select tests.ok((select is_repeat from public.get_discovery_feed(20) where id = 
 
 select tests.login(:A);
 select tests.ok(exists (select 1 from public.get_likes_received() where id = :B), 'A sees B in likes received');
-select tests.ok(exists (select 1 from public.public_profiles where id = :B), 'A can open B''s profile after B liked her');
+select tests.ok(exists (select 1 from public.get_public_profile(:B)), 'A can open B''s profile after B liked her');
 select tests.ok((public.swipe(:B, 'like') ->> 'matched')::boolean, 'mutual like creates a match');
 select tests.ok((public.swipe(:B, 'like') ->> 'matched')::boolean, 'repeat like is idempotent');
 reset role;
@@ -221,8 +222,9 @@ select tests.throws($q$select public.send_message(current_setting('test.conv')::
                     '%not_found%', 'outsider C cannot post into the conversation');
 select tests.throws($q$select public.mark_conversation_read(current_setting('test.conv')::uuid)$q$,
                     '%not_found%', 'outsider C cannot mark it read');
-select tests.ok(not exists (select 1 from public.public_profiles where id in (:A, :B)),
-                'C cannot browse A/B via public_profiles');
+select tests.ok(not exists (select 1 from public.get_public_profile(:A))
+                and not exists (select 1 from public.get_public_profile(:B)),
+                'C cannot open A''s or B''s profile');
 
 -- End-to-end encryption keys: only matches can read them
 select tests.login(:A);
@@ -245,8 +247,57 @@ select tests.throws($q$select public.send_message(current_setting('test.conv')::
 select tests.ok((public.send_message(current_setting('test.conv')::uuid, 'k', gen_random_uuid(), 'image',
                  'aaaaaaaa-0000-0000-0000-000000000001/' || current_setting('test.conv') || '/p.bin', true)).kind = 'image',
                 'photo messages can be sent');
+select tests.ok((public.send_message(current_setting('test.conv')::uuid, 'k', gen_random_uuid(), 'video',
+                 'aaaaaaaa-0000-0000-0000-000000000001/' || current_setting('test.conv') || '/v.bin', true)).kind = 'video',
+                'video messages can be sent');
+select tests.throws($q$select public.send_message(current_setting('test.conv')::uuid, 'k', gen_random_uuid(), 'video', null, true)$q$,
+                    '%invalid_media%', 'a video needs its file');
+select tests.throws($q$select public.send_message(current_setting('test.conv')::uuid, 'k', gen_random_uuid(), 'audio', 'x', true)$q$,
+                    '%unsupported_kind%', 'unknown media kinds are rejected');
 select tests.login(:B);
 select public.ack_messages(array(select id from public.get_pending_messages()));
+
+-- Reactions are relayed like messages and don't count as new activity
+select tests.login(:A);
+select set_config('test.last_at', (select last_message_at::text from public.conversations
+                                    where id = current_setting('test.conv')::uuid), false);
+select tests.ok((public.send_message(current_setting('test.conv')::uuid, '{"to":"x","e":"❤️"}', gen_random_uuid(),
+                 'reaction')).kind = 'reaction', 'reactions can be sent');
+select tests.ok((select last_message_at::text from public.conversations where id = current_setting('test.conv')::uuid)
+                = current_setting('test.last_at'), 'a reaction does not move the chat to the top');
+select tests.throws($q$select public.send_message(current_setting('test.conv')::uuid, ' ', gen_random_uuid(), 'reaction')$q$,
+                    '%empty_message%', 'a reaction needs a body');
+select tests.throws($q$select public.send_message(current_setting('test.conv')::uuid, 'x', gen_random_uuid(), 'reaction',
+                       'aaaaaaaa-0000-0000-0000-000000000001/' || current_setting('test.conv') || '/p.bin')$q$,
+                    '%invalid_media%', 'a reaction cannot carry a file');
+select tests.throws($q$select public.send_message(current_setting('test.conv')::uuid, repeat('x', 1001), gen_random_uuid(),
+                       'reaction', null, true)$q$, '%message_too_long%', 'reactions stay small');
+select tests.login(:B);
+select tests.ok((select count(*) from public.get_pending_messages() where kind = 'reaction') = 1,
+                'B downloads the reaction');
+select tests.ok(public.ack_messages(array(select id from public.get_pending_messages())) = 1,
+                'and it is deleted from the server once saved');
+
+-- Typing indicator: only the two people in the chat can use its channel
+select tests.login(:A);
+select set_config('realtime.topic', 'typing:' || current_setting('test.conv'), false);
+insert into realtime.messages (topic, extension, event, payload)
+values ('typing:' || current_setting('test.conv'), 'broadcast', 'typing', '{"typing":true}');
+select tests.ok(true, 'a member can send "typing" in their chat');
+select tests.login(:B);
+select tests.ok((select count(*) from realtime.messages) = 1, 'the other member receives it');
+select tests.login(:C);
+select tests.ok((select count(*) from realtime.messages) = 0, 'an outsider cannot listen to typing');
+select tests.throws($q$insert into realtime.messages (topic, extension, event, payload)
+                       values ('typing:' || current_setting('test.conv'), 'broadcast', 'typing', '{}')$q$,
+                    '%row-level security%', 'an outsider cannot send typing');
+select set_config('realtime.topic', 'something-else', false);
+select tests.login(:A);
+select tests.ok((select count(*) from realtime.messages) = 0, 'other topics are not opened by the typing policy');
+select set_config('realtime.topic', '', false);
+reset role;
+delete from realtime.messages;
+set role authenticated;
 
 -- Rate limit: 30 messages / minute (B has sent none yet)
 select tests.login(:B);
@@ -333,7 +384,7 @@ select tests.ok((select count(*) from public.messages) = 0, 'block hides message
 select tests.login(:A);
 select tests.throws($q$select public.send_message(current_setting('test.conv')::uuid, 'hello?', gen_random_uuid())$q$,
                     '%conversation_closed%', 'blocked user cannot keep messaging');
-select tests.ok(not exists (select 1 from public.public_profiles where id = :B), 'blocked profile disappears from public_profiles');
+select tests.ok(not exists (select 1 from public.get_public_profile(:B)), 'a blocked profile can no longer be opened');
 select tests.ok((select count(*) from public.get_blocked_users()) = 1, 'A sees who she blocked');
 
 reset role;
@@ -689,6 +740,102 @@ select tests.ok((select status = 'rejected' and document_path is null and reject
                    from public.admin_list_age_verifications(null) where user_id = :G),
                 'a review still pending after 7 days expires, with a reason');
 reset role;
+
+-- -----------------------------------------------------------------------------
+-- Moments: only you and your matches, only for 24 hours
+-- -----------------------------------------------------------------------------
+reset role;
+insert into auth.users (id, email) values
+  ('11111111-0000-4000-8000-000000000001', 'm@test.dev'),
+  ('11111111-0000-4000-8000-000000000002', 'n@test.dev'),
+  ('11111111-0000-4000-8000-000000000003', 'o@test.dev');
+\set M '''11111111-0000-4000-8000-000000000001'''
+\set N '''11111111-0000-4000-8000-000000000002'''
+\set O '''11111111-0000-4000-8000-000000000003'''
+set role authenticated;
+select tests.login(:M);
+insert into public.profiles (id, display_name, birthdate, gender, intention)
+values (:M, 'Maya', current_date - interval '27 years', 'woman', 'long_term');
+select tests.login(:N);
+insert into public.profiles (id, display_name, birthdate, gender, intention)
+values (:N, 'Nabin', current_date - interval '28 years', 'man', 'friends');
+select tests.login(:O);
+insert into public.profiles (id, display_name, birthdate, gender) values (:O, 'Ojas', current_date - interval '30 years', 'man');
+reset role;
+update public.profiles set status = 'active', onboarding_completed = true where id in (:M, :N, :O);
+insert into public.matches (user_low, user_high) values (least(:M::uuid, :N::uuid), greatest(:M::uuid, :N::uuid));
+insert into public.profile_interests (user_id, interest_id)
+select u, i.id from (values (:M::uuid), (:N::uuid)) v(u), (select id from public.interests order by id limit 2) i;
+insert into public.profile_interests (user_id, interest_id)
+select :M::uuid, id from public.interests order by id offset 5 limit 1;
+insert into public.profile_locations (user_id, lat, lng) values (:M, 27.7172, 85.3240), (:N, 27.6710, 85.4298);
+set role authenticated;
+
+select tests.login(:M);
+select tests.throws('select * from public.moments', '%permission denied%', 'the moments table is not directly readable');
+select tests.ok((public.post_moment('Sunset hike today ☀️')).body = 'Sunset hike today ☀️', 'I can post a text moment');
+select tests.throws($q$select public.post_moment('   ')$q$, '%empty_moment%', 'an empty moment is refused');
+select tests.throws($q$select public.post_moment(repeat('x', 201))$q$, '%moment_too_long%', 'moments stay short');
+select tests.throws($q$select public.post_moment(null, 'cccccccc-0000-0000-0000-000000000003/x.jpg')$q$,
+                    '%invalid_media%', 'a moment photo must be in my own folder');
+insert into storage.objects (bucket_id, name, metadata)
+values ('moments', '11111111-0000-4000-8000-000000000001/p.jpg', '{"size": 1000}');
+select tests.ok((public.post_moment(null, '11111111-0000-4000-8000-000000000001/p.jpg')).photo_path is not null,
+                'I can post a photo moment');
+select tests.throws($q$insert into storage.objects (bucket_id, name) values ('moments', 'cccccccc-0000-0000-0000-000000000003/x.jpg')$q$,
+                    '%row-level security%', 'nobody can upload into someone else''s moments folder');
+select tests.ok((select count(*) from public.get_moments() where is_mine) = 2, 'I see my own moments');
+select public.post_moment('third');
+select tests.throws($q$select public.post_moment('fourth')$q$, '%moment_limit%', 'at most 3 live moments');
+
+select tests.login(:N);
+select tests.ok((select count(*) from public.get_moments() where user_id = :M) = 3, 'a match sees my moments');
+select tests.ok(exists (select 1 from storage.objects where bucket_id = 'moments' and name like '11111111-0000-4000-8000-000000000001/%'),
+                'a match can load the moment photo');
+select tests.throws($q$select public.delete_moment((select id from public.get_moments() limit 1))$q$,
+                    '%not_found%', 'a match cannot delete my moment');
+select tests.ok((select array_length(shared_interests, 1) from public.get_match_insights() where other_user_id = :M) = 2,
+                'match insights list the interests we share');
+select tests.ok((select intention from public.get_match_insights() where other_user_id = :M) = 'long_term',
+                'match insights include their mode');
+select tests.ok((select distance_km from public.get_match_insights() where other_user_id = :M) between 10 and 13,
+                'match insights include a rounded distance');
+
+select tests.login(:O);
+select tests.ok(not exists (select 1 from public.get_moments() where user_id = :M), 'a stranger cannot see my moments');
+select tests.ok(not exists (select 1 from storage.objects where bucket_id = 'moments'), 'a stranger cannot load the photo');
+select tests.ok(not exists (select 1 from public.get_match_insights()), 'no insights without a match');
+
+select tests.login(:N);
+select public.block_user(:M);
+select tests.ok(not exists (select 1 from public.get_moments() where user_id = :M), 'blocking hides moments');
+select tests.login(:M);
+select tests.ok(not exists (select 1 from public.get_match_insights() where other_user_id = :N), 'and insights');
+
+-- Expired: gone from the list, the photo can't be read, and it's cleaned up
+reset role;
+update public.moments set expires_at = now() - interval '2 hours' where user_id = :M;
+update storage.objects set created_at = now() - interval '2 hours' where bucket_id = 'moments';
+set role authenticated;
+select tests.login(:M);
+select tests.ok(not exists (select 1 from public.get_moments()), 'expired moments disappear');
+select tests.ok((select array_agg(x) from public.claim_my_expired_moments() x)
+                = array['11111111-0000-4000-8000-000000000001/p.jpg'], 'my expired photos are handed back for deletion');
+select tests.ok(not exists (select 1 from public.get_moments()), 'and the expired moments are removed');
+reset role;
+select tests.ok(exists (select 1 from private.claim_expired_proofs() where bucket = 'moments'),
+                'the scheduled cleanup also removes moment photos without a live moment');
+set role authenticated;
+
+-- -----------------------------------------------------------------------------
+-- No views that run with their owner's rights (Supabase "Security Definer View" lint)
+-- -----------------------------------------------------------------------------
+reset role;
+select tests.ok(not exists (
+         select 1 from pg_class c join pg_namespace n on n.oid = c.relnamespace
+          where n.nspname = 'public' and c.relkind = 'v'
+            and not coalesce(c.reloptions @> array['security_invoker=true'], false)),
+       'every view in public runs with the caller''s rights');
 
 -- -----------------------------------------------------------------------------
 -- Report

@@ -62,11 +62,24 @@ class Routes {
 
 /// Arguments passed to the chat route.
 class ChatRouteArgs {
-  const ChatRouteArgs({required this.matchId, required this.otherUserId, required this.otherName, this.otherPhoto});
+  const ChatRouteArgs({
+    required this.matchId,
+    required this.otherUserId,
+    required this.otherName,
+    this.otherPhoto,
+    this.draft,
+    this.sendDraft = false,
+  });
   final String matchId;
   final String otherUserId;
   final String otherName;
   final String? otherPhoto;
+
+  /// Text to start with in the message box (e.g. a reply to a moment).
+  final String? draft;
+
+  /// Send [draft] straight away instead of leaving it in the box.
+  final bool sendDraft;
 }
 
 final rootNavigatorKey = GlobalKey<NavigatorState>();

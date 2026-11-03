@@ -1,7 +1,7 @@
 // Permanently deletes the calling user's account.
 //
 // 1. Verifies the caller's JWT.
-// 2. Removes all of their files from the `profile-photos` bucket.
+// 2. Removes all of their files from the `profile-photos` and `moments` buckets.
 // 3. Deletes the auth user, which cascades (ON DELETE CASCADE) to their
 //    profile, photos rows, likes, matches, conversations and messages.
 //    Reports keep their row with reporter/reported set to NULL.
@@ -39,14 +39,16 @@ Deno.serve(async (req) => {
   const user = userData?.user;
   if (userError || !user) return json({ error: "not_authenticated" }, 401);
 
-  // Delete photos in batches (storage list is paginated).
-  const bucket = admin.storage.from("profile-photos");
-  for (let i = 0; i < 50; i++) {
-    const { data: files, error } = await bucket.list(user.id, { limit: 100 });
-    if (error) return json({ error: "storage_list_failed", detail: error.message }, 500);
-    if (!files || files.length === 0) break;
-    const { error: removeError } = await bucket.remove(files.map((f) => `${user.id}/${f.name}`));
-    if (removeError) return json({ error: "storage_remove_failed", detail: removeError.message }, 500);
+  // Delete their profile photos and moment photos, in batches (storage list is paginated).
+  for (const name of ["profile-photos", "moments"]) {
+    const bucket = admin.storage.from(name);
+    for (let i = 0; i < 50; i++) {
+      const { data: files, error } = await bucket.list(user.id, { limit: 100 });
+      if (error) return json({ error: "storage_list_failed", detail: error.message }, 500);
+      if (!files || files.length === 0) break;
+      const { error: removeError } = await bucket.remove(files.map((f) => `${user.id}/${f.name}`));
+      if (removeError) return json({ error: "storage_remove_failed", detail: removeError.message }, 500);
+    }
   }
 
   const { error: deleteError } = await admin.auth.admin.deleteUser(user.id);

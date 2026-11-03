@@ -109,15 +109,23 @@ class _BannerAdSlotState extends ConsumerState<BannerAdSlot> {
 /// Native ad using Google's built-in template, inside a clearly labelled
 /// "Sponsored" card. Collapses to nothing on failure.
 class NativeAdCard extends ConsumerStatefulWidget {
-  const NativeAdCard({super.key});
+  const NativeAdCard({super.key, this.padding = EdgeInsets.zero});
+
+  /// Space around the card, applied only when an ad is shown (no empty gaps).
+  final EdgeInsetsGeometry padding;
 
   @override
   ConsumerState<NativeAdCard> createState() => _NativeAdCardState();
 }
 
-class _NativeAdCardState extends ConsumerState<NativeAdCard> {
+class _NativeAdCardState extends ConsumerState<NativeAdCard> with AutomaticKeepAliveClientMixin {
   NativeAd? _ad;
   bool _loaded = false;
+
+  /// Keep a loaded ad when it scrolls out of view, instead of rebuilding the
+  /// native view and requesting a new ad every time it comes back.
+  @override
+  bool get wantKeepAlive => _loaded;
 
   /// While pacing says "not now" (first minute, or the 5-minute limit is
   /// reached), check again every 30 seconds; the ad loads once it's allowed.
@@ -149,7 +157,11 @@ class _NativeAdCardState extends ConsumerState<NativeAdCard> {
         cornerRadius: 12,
       ),
       listener: NativeAdListener(
-        onAdLoaded: (_) => mounted ? setState(() => _loaded = true) : null,
+        onAdLoaded: (_) {
+          if (!mounted) return;
+          setState(() => _loaded = true);
+          updateKeepAlive();
+        },
         onAdFailedToLoad: (ad, _) => ad.dispose(),
         onAdImpression: (_) => ref.read(adPacerProvider.notifier).recordImpression(),
       ),
@@ -165,21 +177,25 @@ class _NativeAdCardState extends ConsumerState<NativeAdCard> {
 
   @override
   Widget build(BuildContext context) {
+    super.build(context); // keep-alive bookkeeping
     final ready = ref.watch(adsReadyProvider);
     if (!ready || !AdsConfig.nativeEnabled) return const SizedBox.shrink();
     _load(context);
     if (!_loaded || _ad == null) return const SizedBox.shrink();
-    return Card(
-      clipBehavior: Clip.antiAlias,
-      child: Column(
-        crossAxisAlignment: CrossAxisAlignment.start,
-        children: [
-          const _SponsoredLabel(),
-          ConstrainedBox(
-            constraints: const BoxConstraints(minHeight: 90, maxHeight: 120),
-            child: AdWidget(ad: _ad!),
-          ),
-        ],
+    return Padding(
+      padding: widget.padding,
+      child: Card(
+        clipBehavior: Clip.antiAlias,
+        child: Column(
+          crossAxisAlignment: CrossAxisAlignment.start,
+          children: [
+            const _SponsoredLabel(),
+            ConstrainedBox(
+              constraints: const BoxConstraints(minHeight: 90, maxHeight: 120),
+              child: AdWidget(ad: _ad!),
+            ),
+          ],
+        ),
       ),
     );
   }

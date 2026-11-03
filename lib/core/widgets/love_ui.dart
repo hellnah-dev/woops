@@ -4,6 +4,7 @@ import 'package:flutter/material.dart';
 import 'package:flutter/services.dart';
 
 import '../theme/app_colors.dart';
+import 'glass.dart';
 
 /// Shrinks slightly while pressed, with a light haptic tap. Makes any card or
 /// tile feel tactile.
@@ -59,20 +60,9 @@ class SoftCard extends StatelessWidget {
 
   @override
   Widget build(BuildContext context) {
-    final theme = Theme.of(context);
-    final dark = theme.brightness == Brightness.dark;
-    final card = Container(
-      padding: padding,
-      decoration: BoxDecoration(
-        color: dark ? const Color(0xFF2A1724) : Colors.white,
-        borderRadius: BorderRadius.circular(AppRadius.md),
-        border: Border.all(color: AppColors.rose.withValues(alpha: dark ? 0.22 : 0.1)),
-        boxShadow: dark
-            ? null
-            : [BoxShadow(color: AppColors.rose.withValues(alpha: 0.06), blurRadius: 18, offset: const Offset(0, 6))],
-      ),
-      child: child,
-    );
+    // Glass card: translucent pane, bright edge and sheen. No blur, so lists
+    // of cards stay fast; it reads as glass over the colourful backdrop.
+    final card = GlassSurface(padding: padding, child: child);
     return onTap == null ? card : PressableScale(onTap: onTap, scale: 0.98, child: card);
   }
 }

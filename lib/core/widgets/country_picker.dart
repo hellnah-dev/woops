@@ -5,6 +5,8 @@ import '../i18n/countries.dart';
 /// Searchable country list. Returns the chosen country (single mode) or the
 /// chosen set (multi mode, via [showCountryMultiPicker]).
 Future<Country?> showCountryPicker(BuildContext context, {String? selected}) => showModalBottomSheet<Country>(
+  // Over the whole screen, never under the glass tab bar.
+  useRootNavigator: true,
   context: context,
   isScrollControlled: true,
   useSafeArea: true,
@@ -13,6 +15,8 @@ Future<Country?> showCountryPicker(BuildContext context, {String? selected}) => 
 
 Future<Set<String>?> showCountryMultiPicker(BuildContext context, {required Set<String> selected}) =>
     showModalBottomSheet<Set<String>>(
+      // Over the whole screen, never under the glass tab bar.
+      useRootNavigator: true,
       context: context,
       isScrollControlled: true,
       useSafeArea: true,

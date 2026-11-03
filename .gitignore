@@ -65,3 +65,4 @@ supabase/setup_all.sql
 *firebase-adminsdk*.json
 supabase/.push_webhook_secret
 supabase/.setup_push_webhooks.local.sql
+supabase/.resend_key

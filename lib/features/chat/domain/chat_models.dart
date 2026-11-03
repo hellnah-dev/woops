@@ -1,7 +1,17 @@
+import 'dart:convert';
+
 enum MessageKind {
   text,
   image,
+  video,
+
+  /// A reaction to another message. Relayed, then attached to that message on
+  /// the phone; never shown as a message of its own.
+  reaction,
   system;
+
+  /// Photos and videos: always view-once.
+  bool get isMedia => this == image || this == video;
 
   static MessageKind fromValue(String? v) =>
       MessageKind.values.firstWhere((k) => k.name == v, orElse: () => MessageKind.text);
@@ -23,6 +33,9 @@ class ChatMessage {
     this.delivery = DeliveryState.sent,
     this.encrypted = false,
     this.localPath,
+    this.viewed = false,
+    this.viewOnce = false,
+    this.reactions = const {},
   });
 
   /// Server id. For optimistic messages this equals [clientId] until the server responds.
@@ -39,8 +52,18 @@ class ChatMessage {
   /// Sent end-to-end encrypted (the server only saw ciphertext).
   final bool encrypted;
 
-  /// Photo saved on this phone (chat photos never stay on the server).
+  /// Photo/video saved on this phone (until it is viewed, for view-once media).
   final String? localPath;
+
+  /// View-once media: true once opened (received) or sent. The file is gone.
+  final bool viewed;
+
+  /// Sent as view once (every photo/video since view-once was added). Older
+  /// photos stay on the phone and can be opened any number of times.
+  final bool viewOnce;
+
+  /// Who reacted with what (user id → emoji), stored on the phone only.
+  final Map<String, String> reactions;
 
   factory ChatMessage.fromJson(Map<String, dynamic> json) => ChatMessage(
     id: json['id'] as String,
@@ -53,6 +76,9 @@ class ChatMessage {
     createdAt: DateTime.parse(json['created_at'] as String),
     encrypted: (json['metadata'] as Map?)?['e2e'] == true || json['encrypted'] == true,
     localPath: json['local_path'] as String?,
+    viewed: json['viewed'] == true,
+    viewOnce: json['view_once'] == true,
+    reactions: json['reactions'] is Map ? Map<String, String>.from(json['reactions'] as Map) : const {},
   );
 
   /// Saved on the phone. A message still "sending" when the app closed is
@@ -79,9 +105,21 @@ class ChatMessage {
     'delivery': delivery.name,
     'encrypted': encrypted,
     'local_path': localPath,
+    'viewed': viewed,
+    if (viewOnce) 'view_once': true,
+    if (reactions.isNotEmpty) 'reactions': reactions,
   };
 
-  ChatMessage copyWith({DeliveryState? delivery, String? body, String? localPath, bool? encrypted}) => ChatMessage(
+  ChatMessage copyWith({
+    DeliveryState? delivery,
+    String? body,
+    String? localPath,
+    bool clearLocalPath = false,
+    bool? encrypted,
+    bool? viewed,
+    bool? viewOnce,
+    Map<String, String>? reactions,
+  }) => ChatMessage(
     id: id,
     conversationId: conversationId,
     senderId: senderId,
@@ -92,8 +130,39 @@ class ChatMessage {
     createdAt: createdAt,
     delivery: delivery ?? this.delivery,
     encrypted: encrypted ?? this.encrypted,
-    localPath: localPath ?? this.localPath,
+    localPath: clearLocalPath ? null : (localPath ?? this.localPath),
+    viewed: viewed ?? this.viewed,
+    viewOnce: viewOnce ?? this.viewOnce,
+    reactions: reactions ?? this.reactions,
   );
+
+  /// This message with [userId]'s reaction set to [emoji] (empty removes it).
+  ChatMessage withReaction(String userId, String emoji) => copyWith(
+    reactions: {...reactions}
+      ..remove(userId)
+      ..addAll(emoji.isEmpty ? const {} : {userId: emoji}),
+  );
+}
+
+/// What a reaction message carries: the reacted message and the emoji
+/// (empty when the reaction is removed).
+class ReactionPayload {
+  const ReactionPayload(this.targetClientId, this.emoji);
+  final String targetClientId;
+  final String emoji;
+
+  String encode() => jsonEncode({'to': targetClientId, 'e': emoji});
+
+  static ReactionPayload? tryParse(String? body) {
+    try {
+      final j = jsonDecode(body ?? '') as Map;
+      final to = j['to'], e = j['e'];
+      if (to is! String || e is! String || to.isEmpty || e.length > 16) return null;
+      return ReactionPayload(to, e);
+    } catch (_) {
+      return null;
+    }
+  }
 }
 
 /// Merges [incoming] messages into [existing] (both newest-first), replacing
@@ -165,7 +234,8 @@ class ConversationSummary {
   String previewFor(String myUserId) {
     final prefix = lastMessageSenderId == myUserId ? 'You: ' : '';
     return switch (lastMessageKind) {
-      MessageKind.image => '${prefix}Sent a photo',
+      MessageKind.image => '$prefix📷 Photo',
+      MessageKind.video => '$prefix🎥 Video',
       MessageKind.system => lastMessageBody ?? '',
       null => 'Tap to keep chatting',
       _ => '$prefix${lastMessageBody ?? ''}',

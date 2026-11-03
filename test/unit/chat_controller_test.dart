@@ -5,7 +5,9 @@ import 'package:woops/core/utils/image_processing.dart';
 import 'package:woops/features/chat/application/chat_controllers.dart';
 import 'package:woops/features/chat/data/chat_crypto.dart';
 import 'package:woops/features/chat/data/chat_repository.dart';
+import 'package:woops/core/utils/app_exception.dart';
 import 'package:woops/features/chat/data/local_chat_store.dart';
+import 'package:woops/features/chat/data/media_compressor.dart';
 import 'package:woops/features/chat/domain/chat_models.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
 import 'package:flutter_test/flutter_test.dart';
@@ -47,6 +49,7 @@ void main() {
           (ref) => ChatCrypto(vault: MemoryKeyVault(), userId: 'me', fetchPublicKey: repo.fetchChatKey),
         ),
         imageProcessorProvider.overrideWithValue(ImageProcessor(isWeb: true)),
+        mediaCompressorProvider.overrideWithValue(_FakeCompressor()),
       ],
     );
     addTearDown(container.dispose);
@@ -146,6 +149,43 @@ void main() {
     expect(state().otherReadAt, at);
   });
 
+  test('typing: the other person\'s "typing" shows and clears when their message arrives', () async {
+    repo = FakeChatRepository();
+    await start();
+    repo.typing.other.add(true);
+    await pumpEventQueue();
+    expect(state().otherTyping, isTrue);
+    repo.incoming.add(msg('x1', at: DateTime.now().toUtc()));
+    await pumpEventQueue();
+    expect(state().otherTyping, isFalse);
+  });
+
+  test('typing: I send "typing" once while typing fast, and "stopped" when I send', () async {
+    repo = FakeChatRepository();
+    final c = await start();
+    c.setTyping(true);
+    c.setTyping(true);
+    c.setTyping(true);
+    expect(repo.typing.sent, [true]);
+    await c.send('hi');
+    expect(repo.typing.sent, [true, false]);
+    container.dispose();
+    expect(repo.typing.closed, isTrue);
+  });
+
+  test('chat search finds text saved on the phone, newest match per chat, any letter case', () async {
+    final t = DateTime.utc(2026, 10, 21);
+    await store.upsert('c1', [
+      msg('1', at: t).copyWith(body: 'see you at the Cafe'),
+      msg('2', at: t.add(const Duration(minutes: 1))).copyWith(body: 'cafe was great'),
+    ]);
+    await store.upsert('c2', [msg('3', at: t).copyWith(body: 'nothing here')]);
+    final hits = await store.search(['c1', 'c2'], 'CAFE');
+    expect(hits.keys, ['c1']);
+    expect(hits['c1']!.body, 'cafe was great');
+    expect(await store.search(['c1', 'c2'], '   '), isEmpty);
+  });
+
   test('local messages survive a JSON round trip; "sending" restores as failed', () {
     final m = msg('a', at: DateTime.utc(2026, 10, 14)).copyWith(delivery: DeliveryState.sending);
     final back = ChatMessage.fromLocalJson(m.toLocalJson());
@@ -165,6 +205,8 @@ void main() {
           currentUserIdProvider.overrideWithValue('me'),
           chatCryptoProvider.overrideWithValue(myCrypto),
           imageProcessorProvider.overrideWithValue(ImageProcessor(isWeb: true)),
+          mediaCompressorProvider.overrideWithValue(_FakeCompressor()),
+          mediaCompressorProvider.overrideWithValue(_FakeCompressor()),
         ],
       );
       addTearDown(container.dispose);
@@ -200,6 +242,90 @@ void main() {
       expect(local.encrypted, isTrue);
     });
 
+    test('reactions: shown at once, saved on the phone, sent encrypted; the same emoji again removes it', () async {
+      final c = await startWithKeys();
+      final target = msg('t1', at: DateTime.utc(2026, 10, 14));
+      await store.upsert('c1', [target]);
+      await pumpEventQueue();
+      await c.react(state().messages.single, '❤️');
+      expect(state().messages.single.reactions, {'me': '❤️'});
+      expect((await store.read('c1')).messages.single.reactions, {'me': '❤️'});
+      expect(repo.sentKinds, [MessageKind.reaction]);
+      expect(repo.sentEncrypted, [true]);
+      final wire = await theirCrypto.decrypt(repo.sentBodies.single, conversationId: 'c1');
+      expect(ReactionPayload.tryParse(wire)!.targetClientId, target.clientId);
+      // A reaction is not a message: the chat still has just the one.
+      expect((await store.read('c1')).messages, hasLength(1));
+
+      await c.react(state().messages.single, '❤️');
+      expect(state().messages.single.reactions, isEmpty);
+      expect(repo.sentEncrypted.last, isFalse, reason: 'removing names only a random id');
+      expect(ReactionPayload.tryParse(repo.sentBodies.last)!.emoji, '');
+    });
+
+    test('an incoming reaction attaches to its message and is acknowledged', () async {
+      await startWithKeys();
+      final target = msg('t1', sender: 'me', at: DateTime.utc(2026, 10, 14));
+      await store.upsert('c1', [target]);
+      await pumpEventQueue();
+      final sealed = await theirCrypto.encrypt(
+        ReactionPayload(target.clientId, '😂').encode(),
+        conversationId: 'c1',
+        otherUserId: 'me',
+      );
+      repo.incoming.add(
+        ChatMessage(
+          id: 'r1',
+          conversationId: 'c1',
+          senderId: 'other',
+          clientId: 'r1',
+          kind: MessageKind.reaction,
+          body: sealed,
+          encrypted: true,
+          createdAt: DateTime.now().toUtc(),
+        ),
+      );
+      await pumpEventQueue();
+      expect(state().messages.single.reactions, {'other': '😂'});
+      expect((await store.read('c1')).messages.single.reactions, {'other': '😂'});
+      expect(repo.ackedIds, ['r1']);
+    });
+
+    test('a reaction waiting on the relay finds a message that arrived in the same batch', () async {
+      repo = FakeChatRepository();
+      await withKeys();
+      final m = msg('m1', at: DateTime.utc(2026, 10, 14));
+      repo.pending = [
+        m,
+        ChatMessage(
+          id: 'r1',
+          conversationId: 'c1',
+          senderId: 'other',
+          clientId: 'r1',
+          kind: MessageKind.reaction,
+          body: ReactionPayload(m.clientId, '👍').encode(),
+          createdAt: DateTime.utc(2026, 10, 14, 0, 1),
+        ),
+      ];
+      final sync = ChatSync(repo, store, myCrypto, 'me');
+      await sync.syncPending();
+      final saved = (await store.read('c1')).messages;
+      expect(saved.map((x) => x.id), ['m1']);
+      expect(saved.single.reactions, {'other': '👍'});
+      expect(repo.ackedIds, ['m1', 'r1']);
+    });
+
+    test('a reaction that can’t be sent is taken back', () async {
+      final c = await startWithKeys();
+      await store.upsert('c1', [msg('t1', at: DateTime.utc(2026, 10, 14))]);
+      await pumpEventQueue();
+      repo.failNextSends = 1;
+      await c.react(state().messages.single, '😮');
+      expect(state().messages.single.reactions, isEmpty);
+      expect((await store.read('c1')).messages.single.reactions, isEmpty);
+      expect(state().error, isNotNull);
+    });
+
     test('incoming encrypted messages are decrypted before they are saved', () async {
       await startWithKeys();
       final sealed = await theirCrypto.encrypt('Dinner Friday?', conversationId: 'c1', otherUserId: 'me');
@@ -220,7 +346,9 @@ void main() {
       expect(repo.media[path], isNot(photo)); // only ciphertext leaves the phone
       final mine = state().messages.single;
       expect(mine.kind, MessageKind.image);
-      expect(store.media[mine.localPath], photo);
+      // View-once: the sender keeps no copy once it's sent.
+      expect(mine.localPath, isNull);
+      expect(store.media, isEmpty);
 
       // The other phone receives it through the relay.
       final otherStore = MemoryLocalChatStore();
@@ -240,6 +368,54 @@ void main() {
       final opened = await sync.open(relayed);
       expect(otherStore.media[opened.localPath], photo);
       expect(otherRepo.media, isEmpty); // deleted from the server once saved
+      expect(opened.viewed, isFalse);
+    });
+
+    test('view once: after the receiver views it, the file is gone and it can’t be opened again', () async {
+      final c = await startWithKeys();
+      final local = await store.saveMedia('c1', 'x.img', Uint8List.fromList([1, 2, 3]));
+      final m = ChatMessage(
+        id: 'm9',
+        conversationId: 'c1',
+        senderId: 'other',
+        clientId: 'm9',
+        kind: MessageKind.image,
+        body: '📷 Photo',
+        createdAt: DateTime.now().toUtc(),
+        localPath: local,
+      );
+      await store.upsert('c1', [m]);
+      await pumpEventQueue();
+      await c.markViewed(state().messages.single);
+      expect(store.media, isEmpty);
+      final saved = (await store.read('c1')).messages.single;
+      expect(saved.viewed, isTrue);
+      expect(saved.localPath, isNull);
+    });
+
+    test('several photos and a video are compressed and sent in order', () async {
+      final c = await startWithKeys();
+      await c.sendMedia([
+        OutgoingMedia.image(Uint8List(3000)),
+        OutgoingMedia.image(Uint8List(2000)),
+        OutgoingMedia.video('/tmp/clip.mp4'),
+      ]);
+      expect(repo.sentClientIds, hasLength(3));
+      expect(state().messages.map((m) => m.kind).toList().reversed, [
+        MessageKind.image,
+        MessageKind.image,
+        MessageKind.video,
+      ]);
+      expect(state().messages.every((m) => m.delivery == DeliveryState.sent && m.viewed), isTrue);
+      expect(repo.media, hasLength(3)); // three encrypted files on the relay
+      expect(store.media, isEmpty); // nothing kept on the sender's phone
+    });
+
+    test('a video that is still too big after compressing is refused with a clear message', () async {
+      final c = await startWithKeys();
+      await c.sendMedia([OutgoingMedia.video('/tmp/too-big.mp4')]);
+      expect(state().error?.code, 'media_too_large');
+      expect(repo.media, isEmpty);
     });
 
     test('a photo is refused when the 5 MB media allowance would be exceeded', () async {
@@ -251,4 +427,18 @@ void main() {
       expect(repo.media, isEmpty);
     });
   });
+}
+
+/// Stands in for the phone's photo/video compression in tests.
+class _FakeCompressor implements MediaCompressor {
+  @override
+  Future<Uint8List> image(Uint8List original) async => original;
+
+  @override
+  Future<Uint8List> video(String path) async {
+    if (path.contains('too-big')) {
+      throw const AppException('This video is still too big.', code: 'media_too_large');
+    }
+    return Uint8List.fromList(List.generate(4000, (i) => i % 256));
+  }
 }

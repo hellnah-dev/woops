@@ -50,6 +50,8 @@ class ProfilePhoto extends ConsumerWidget {
       final resolver = ref.watch(photoUrlResolverProvider);
       final key = thumbnail ? thumbnailPathFor(path) : path;
       child = CachedNetworkImage(
+        // Retry after a token refresh; cached copies still show instantly.
+        key: ValueKey('$key#${resolver.sessionTag}'),
         imageUrl: resolver.url(key),
         cacheKey: key,
         httpHeaders: resolver.headers,

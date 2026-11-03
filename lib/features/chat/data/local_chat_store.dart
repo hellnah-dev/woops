@@ -48,14 +48,48 @@ abstract class LocalChatStore {
   /// Deletes every conversation of this user (account deletion).
   Future<void> wipe();
 
-  /// Saves a chat photo on the phone and returns its file path.
+  /// Saves a chat photo/video on the phone and returns its file path.
   Future<String> saveMedia(String conversationId, String name, Uint8List bytes);
+
+  /// Deletes one saved media file (view-once: after it has been viewed or sent).
+  Future<void> deleteMedia(String path);
+
+  /// Where a saved media file is now, or null if it's gone. Saved paths can
+  /// go stale: iOS moves the app's folder on every app update.
+  Future<String?> resolveMedia(String path);
+
+  /// Changes one message (found by client id) in a single locked step, so
+  /// concurrent updates (e.g. two reactions arriving at once) never overwrite
+  /// each other. Returns the changed message, or null if it isn't here.
+  Future<ChatMessage?> updateMessage(
+    String conversationId,
+    String clientId,
+    ChatMessage Function(ChatMessage current) change,
+  );
+
+  /// Searches message text on this phone. Returns, per conversation, the
+  /// newest message containing [query] (case-insensitive).
+  Future<Map<String, ChatMessage>> search(Iterable<String> conversationIds, String query) async {
+    final q = query.trim().toLowerCase();
+    if (q.isEmpty) return const {};
+    final hits = <String, ChatMessage>{};
+    for (final id in conversationIds) {
+      final conv = await read(id);
+      for (final m in conv.messages) {
+        if (m.kind == MessageKind.text && (m.body ?? '').toLowerCase().contains(q)) {
+          hits[id] = m; // newest first, so the first hit is the newest
+          break;
+        }
+      }
+    }
+    return hits;
+  }
 
   /// Fires with a conversation id whenever that conversation changes.
   Stream<String> get changes;
 }
 
-class FileLocalChatStore implements LocalChatStore {
+class FileLocalChatStore extends LocalChatStore {
   FileLocalChatStore(this._userId, {Future<Directory> Function()? baseDir})
     : _baseDir = baseDir ?? getApplicationDocumentsDirectory;
 
@@ -135,6 +169,26 @@ class FileLocalChatStore implements LocalChatStore {
       });
 
   @override
+  Future<ChatMessage?> updateMessage(
+    String conversationId,
+    String clientId,
+    ChatMessage Function(ChatMessage current) change,
+  ) => _serial(conversationId, () async {
+    final current = await read(conversationId);
+    final target = current.messages.where((m) => m.clientId == clientId).firstOrNull;
+    if (target == null) return null;
+    final updated = change(target);
+    await _write(
+      conversationId,
+      LocalConversation(
+        messages: [for (final m in current.messages) m.clientId == clientId ? updated : m],
+        lastReadAt: current.lastReadAt,
+      ),
+    );
+    return updated;
+  });
+
+  @override
   Future<void> markRead(String conversationId, DateTime at) => _serial(conversationId, () async {
     final current = await read(conversationId);
     if (current.lastReadAt != null && !at.isAfter(current.lastReadAt!)) return;
@@ -187,6 +241,19 @@ class FileLocalChatStore implements LocalChatStore {
   }
 
   @override
+  Future<void> deleteMedia(String path) async {
+    final resolved = await resolveMedia(path);
+    if (resolved != null) await File(resolved).delete();
+  }
+
+  @override
+  Future<String?> resolveMedia(String path) async {
+    if (await File(path).exists()) return path;
+    final moved = File('${(await _folder()).path}/media/${path.split(Platform.pathSeparator).last}');
+    return await moved.exists() ? moved.path : null;
+  }
+
+  @override
   Future<void> wipe() async {
     _cache.clear();
     final dir = await _folder();
@@ -196,7 +263,7 @@ class FileLocalChatStore implements LocalChatStore {
 }
 
 /// In-memory store for tests and web (where there is no app documents folder).
-class MemoryLocalChatStore implements LocalChatStore {
+class MemoryLocalChatStore extends LocalChatStore {
   final _data = <String, LocalConversation>{};
   final _changes = StreamController<String>.broadcast();
 
@@ -213,6 +280,24 @@ class MemoryLocalChatStore implements LocalChatStore {
     _data[conversationId] = next;
     _changes.add(conversationId);
     return next;
+  }
+
+  @override
+  Future<ChatMessage?> updateMessage(
+    String conversationId,
+    String clientId,
+    ChatMessage Function(ChatMessage current) change,
+  ) async {
+    final current = await read(conversationId);
+    final target = current.messages.where((m) => m.clientId == clientId).firstOrNull;
+    if (target == null) return null;
+    final updated = change(target);
+    _data[conversationId] = LocalConversation(
+      messages: [for (final m in current.messages) m.clientId == clientId ? updated : m],
+      lastReadAt: current.lastReadAt,
+    );
+    _changes.add(conversationId);
+    return updated;
   }
 
   @override
@@ -246,6 +331,12 @@ class MemoryLocalChatStore implements LocalChatStore {
   Future<void> wipe() async => _data.clear();
 
   final media = <String, Uint8List>{};
+
+  @override
+  Future<void> deleteMedia(String path) async => media.remove(path);
+
+  @override
+  Future<String?> resolveMedia(String path) async => media.containsKey(path) ? path : null;
 
   @override
   Future<String> saveMedia(String conversationId, String name, Uint8List bytes) async {

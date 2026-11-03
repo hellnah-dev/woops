@@ -52,6 +52,27 @@ end $$;
 
 create publication supabase_realtime;
 
+-- Realtime Authorization: broadcast/presence on private channels is checked
+-- with RLS on realtime.messages, with the channel name in realtime.topic().
+create schema realtime;
+create table realtime.messages (
+  id bigserial primary key,
+  topic text not null,
+  extension text not null,
+  event text,
+  payload jsonb,
+  private boolean default true,
+  inserted_at timestamptz default now()
+);
+alter table realtime.messages enable row level security;
+create function realtime.topic() returns text language sql stable as $$
+  select nullif(current_setting('realtime.topic', true), '')::text
+$$;
+grant usage on schema realtime to authenticated;
+grant select, insert on realtime.messages to authenticated;
+grant usage on sequence realtime.messages_id_seq to authenticated;
+grant execute on function realtime.topic() to authenticated;
+
 grant usage on schema public, auth, storage to anon, authenticated, service_role;
 grant execute on all functions in schema auth to anon, authenticated, service_role;
 grant select, insert, update, delete on storage.objects to authenticated;

@@ -6,6 +6,7 @@ import '../../../core/router/app_router.dart';
 import '../../../core/theme/app_colors.dart';
 import '../../../core/utils/validators.dart';
 import '../../../core/widgets/love_ui.dart';
+import '../../../core/widgets/photo_viewer.dart';
 import '../../../core/widgets/profile_photo.dart';
 import '../../../core/widgets/state_views.dart';
 import '../../ads/ad_widgets.dart';
@@ -43,7 +44,12 @@ class MyProfileScreen extends ConsumerWidget {
           return RefreshIndicator(
             onRefresh: () => ref.read(myProfileProvider.notifier).refresh(),
             child: ListView(
-              padding: const EdgeInsets.fromLTRB(AppSpacing.md, AppSpacing.xs, AppSpacing.md, AppSpacing.xl),
+              padding: EdgeInsets.fromLTRB(
+                AppSpacing.md,
+                AppSpacing.xs,
+                AppSpacing.md,
+                AppSpacing.xl + MediaQuery.paddingOf(context).bottom,
+              ),
               children: [
                 _Header(profile: p),
                 const SizedBox(height: AppSpacing.md),
@@ -98,8 +104,7 @@ class MyProfileScreen extends ConsumerWidget {
                     ],
                   ),
                 ),
-                const SizedBox(height: AppSpacing.md),
-                const NativeAdCard(),
+                const NativeAdCard(padding: EdgeInsets.only(top: AppSpacing.md)),
               ],
             ),
           );
@@ -124,10 +129,19 @@ class _Header extends StatelessWidget {
         Stack(
           clipBehavior: Clip.none,
           children: [
-            GradientRing(
-              value: p.completeness,
-              size: 84,
-              child: ProfileAvatar(storagePath: p.primaryPhoto, size: 70),
+            Semantics(
+              button: true,
+              label: 'View your photos',
+              child: GestureDetector(
+                onTap: p.photos.isEmpty
+                    ? null
+                    : () => showPhotoViewer(context, photos: [for (final ph in p.photos) ph.storagePath]),
+                child: GradientRing(
+                  value: p.completeness,
+                  size: 84,
+                  child: ProfileAvatar(storagePath: p.primaryPhoto, size: 70),
+                ),
+              ),
             ),
             Positioned(
               right: -2,

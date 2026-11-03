@@ -17,7 +17,7 @@ let config;
 try {
   config = await import('./config.js');
 } catch {
-  document.body.innerHTML = `<div class="login"><div class="card login-card"><h2>Setup needed</h2>
+  document.body.innerHTML = `<div class="login single"><div class="card login-card"><h2>Setup needed</h2>
     <p>Copy <code>admin/js/config.example.js</code> to <code>admin/js/config.js</code> and add your Supabase URL and publishable key.</p></div></div>`;
   throw new Error('missing config.js');
 }

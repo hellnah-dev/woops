@@ -22,7 +22,16 @@ class PhotoUrlResolver {
   const PhotoUrlResolver(this._client);
   final SupabaseClient _client;
 
-  String url(String storagePath) => '${Env.supabaseUrl}/storage/v1/object/authenticated/profile-photos/$storagePath';
+  String url(String storagePath) => urlIn('profile-photos', storagePath);
+
+  /// A file in any private bucket (the caller's storage rules apply).
+  String urlIn(String bucket, String storagePath) =>
+      '${Env.supabaseUrl}/storage/v1/object/authenticated/$bucket/$storagePath';
+
+  /// Changes whenever the login token does. Image widgets key on it so a
+  /// photo that failed with an expired token loads again once it's refreshed
+  /// (the image cache ignores headers when comparing images).
+  String get sessionTag => (_client.auth.currentSession?.accessToken ?? '').hashCode.toString();
 
   Map<String, String> get headers {
     final token = _client.auth.currentSession?.accessToken;

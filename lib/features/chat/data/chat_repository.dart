@@ -1,6 +1,6 @@
 import 'dart:async';
-import 'dart:typed_data';
 
+import 'package:flutter/foundation.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
 import 'package:supabase_flutter/supabase_flutter.dart';
 
@@ -48,7 +48,18 @@ abstract class ChatRepository {
   /// Fires whenever any of my conversations or matches change.
   Stream<void> watchInbox();
 
+  /// "Typing…" for one conversation. Nothing is stored anywhere.
+  TypingChannel typingChannel(String conversationId);
+
   Future<void> unmatch(String matchId);
+}
+
+/// Live "is typing" signals between the two people in a conversation.
+abstract class TypingChannel {
+  /// The other person started (true) or stopped (false) typing.
+  Stream<bool> get otherTyping;
+  Future<void> send(bool typing);
+  Future<void> close();
 }
 
 class SupabaseChatRepository implements ChatRepository {
@@ -209,9 +220,59 @@ class SupabaseChatRepository implements ChatRepository {
   }
 
   @override
+  TypingChannel typingChannel(String conversationId) => _SupabaseTypingChannel(_client, conversationId);
+
+  @override
   Future<void> unmatch(String matchId) => _client.rpc('unmatch', params: {'p_match_id': matchId});
 }
 
 final chatRepositoryProvider = Provider<ChatRepository>(
   (ref) => SupabaseChatRepository(ref.watch(supabaseClientProvider)),
 );
+
+/// Realtime broadcast on the private topic `typing:<conversation>`; RLS on
+/// realtime.messages lets only the two members join it.
+class _SupabaseTypingChannel implements TypingChannel {
+  _SupabaseTypingChannel(this._client, String conversationId) {
+    final me = _client.auth.currentUser?.id;
+    _channel = _client
+        .channel('typing:$conversationId', opts: const RealtimeChannelConfig(private: true))
+        .onBroadcast(
+          event: 'typing',
+          callback: (message) {
+            final p = message['payload'] is Map ? Map<String, dynamic>.from(message['payload'] as Map) : message;
+            if (p['user'] == me || _controller.isClosed) return;
+            _controller.add(p['typing'] == true);
+          },
+        )
+        .subscribe((status, error) {
+          if (error != null || status == RealtimeSubscribeStatus.channelError) {
+            debugPrint('Typing channel $status: $error');
+          }
+        });
+    _me = me;
+  }
+
+  final SupabaseClient _client;
+  late final RealtimeChannel _channel;
+  String? _me;
+  final _controller = StreamController<bool>.broadcast();
+
+  @override
+  Stream<bool> get otherTyping => _controller.stream;
+
+  @override
+  Future<void> send(bool typing) async {
+    try {
+      await _channel.sendBroadcastMessage(event: 'typing', payload: {'user': _me, 'typing': typing});
+    } catch (_) {
+      // Best effort: a missed "typing" signal doesn't matter.
+    }
+  }
+
+  @override
+  Future<void> close() async {
+    await _controller.close();
+    await _client.removeChannel(_channel);
+  }
+}
