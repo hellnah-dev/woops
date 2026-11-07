@@ -67,10 +67,14 @@ void main() {
         'shared_interests': ['Hiking', 'Coffee', 'Music'],
         'distance_km': 12,
       });
-      expect(i.summary, '3 in common · 12 km');
+      expect(i.summaryFor(regionCode: 'NP'), '3 in common · 12 km');
+      expect(
+        const MatchInsight(intention: Intention.friends, distanceKm: 1).summaryFor(regionCode: 'NP'),
+        'Less than 2 km',
+      );
       expect(i.mode, MatchMode.friends);
       expect(const MatchInsight(intention: Intention.longTerm).summary, isNull);
-      expect(const MatchInsight(intention: Intention.longTerm, distanceKm: 4).summary, '4 km');
+      expect(const MatchInsight(intention: Intention.longTerm, distanceKm: 4).summaryFor(regionCode: 'NP'), '4 km');
     });
   });
 }

@@ -117,6 +117,8 @@ async function buildPushes(db: SupabaseClient, payload: WebhookPayload): Promise
     const name = await displayName(db, senderId);
     const body = r.kind === "reaction"
       ? (reaction ? `Reacted ${reaction} to your message` : "Reacted to your message")
+      : r.kind === "gif"
+      ? "Sent you a GIF"
       : r.kind === "image"
       ? "Sent you a photo 📷 (view once)"
       : r.kind === "video"

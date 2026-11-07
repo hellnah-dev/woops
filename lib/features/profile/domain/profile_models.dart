@@ -138,8 +138,7 @@ enum AgeCheck { none, pending, approved, rejected }
 enum ProfileStep {
   photos('Add at least 2 photos', 'People want to see who they are talking to.'),
   bio('Write a short bio', 'A few lines about you start better conversations.'),
-  interests('Pick 3 or more interests', 'We use them to suggest people you will click with.'),
-  ageCheck('Confirm your age with an ID', 'Keeps Woops adults-only, following the rules in your country.');
+  interests('Pick 3 or more interests', 'We use them to suggest people you will click with.');
 
   const ProfileStep(this.title, this.why);
   final String title;
@@ -219,21 +218,16 @@ class MyProfile {
     if (photos.length < 2) ProfileStep.photos,
     if (bio.trim().isEmpty) ProfileStep.bio,
     if (interestIds.length < 3) ProfileStep.interests,
-    if (ageCheck != AgeCheck.approved && ageCheck != AgeCheck.pending) ProfileStep.ageCheck,
   ];
 
   bool get isReadyToDate => missingSteps.isEmpty;
 
   /// Everything that counts towards 100%, with its share of the score.
   List<CompletionItem> get completionItems => [
-    CompletionItem('Add 4 photos (${photos.length}/4)', 0.35, (photos.length.clamp(0, 4)) / 4),
-    CompletionItem('Write a bio', 0.15, bio.trim().isNotEmpty ? 1 : 0),
+    CompletionItem('Add 4 photos (${photos.length}/4)', 0.4, (photos.length.clamp(0, 4)) / 4),
+    CompletionItem('Write a bio', 0.2, bio.trim().isNotEmpty ? 1 : 0),
     CompletionItem('Pick 3+ interests', 0.15, interestIds.length >= 3 ? 1 : 0),
-    CompletionItem(
-      'Confirm your age with an ID',
-      0.15,
-      ageCheck == AgeCheck.approved || ageCheck == AgeCheck.pending ? 1 : 0,
-    ),
+    CompletionItem('Verify with a selfie', 0.05, isVerified ? 1 : 0),
     CompletionItem('Answer a prompt', 0.1, prompts.isNotEmpty ? 1 : 0),
     CompletionItem('Add your job', 0.05, (jobTitle ?? '').isNotEmpty ? 1 : 0),
     CompletionItem('Add your city', 0.05, (city ?? '').isNotEmpty ? 1 : 0),

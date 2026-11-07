@@ -40,7 +40,7 @@ class ImageProcessor {
   static const maxFullBytes = 350 * 1024;
   static const qualityLadder = [80, 70, 60, 50];
 
-  /// Largest single file (ID documents); media also has a 5 MB total per person.
+  /// Largest single file picked (before compression); media also has a 3 MB total per person.
   static const maxUploadBytes = 5 * 1024 * 1024;
 
   /// Rejects files over 5 MB before any work is done.

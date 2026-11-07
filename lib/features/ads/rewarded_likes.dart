@@ -9,12 +9,15 @@ import '../../core/widgets/state_views.dart';
 import 'ads_config.dart';
 import 'ads_service.dart';
 
-/// Offered only when the user has run out of likes. The reward is granted by
-/// the server after Google's server-side verification callback, never by the
-/// app, so this just shows the ad and then checks the new allowance.
-Future<void> offerRewardedLikes(BuildContext context, WidgetRef ref) async {
+/// Offered when the user has run out of likes or swipes. The reward (more
+/// likes and swipes) is granted by the server after Google's server-side
+/// verification callback, never by the app, so this just shows the ad and
+/// then checks the new allowance.
+Future<void> offerRewardedLikes(BuildContext context, WidgetRef ref, {bool swipes = false}) async {
+  final outOf = swipes ? 'swipes' : 'likes';
+  final outMessage = 'You’re out of $outOf for today. They refresh within 24 hours.';
   if (!AdsConfig.rewardedEnabled || !ref.read(adsReadyProvider)) {
-    showSnack(context, 'You’re out of likes for today. They refresh within 24 hours.');
+    showSnack(context, outMessage);
     return;
   }
   final client = ref.read(supabaseClientProvider);
@@ -31,18 +34,19 @@ Future<void> offerRewardedLikes(BuildContext context, WidgetRef ref) async {
   }
   if (!context.mounted) return;
   if ((allowance['rewarded_ads_left'] as num? ?? 0) <= 0) {
-    showSnack(context, 'You’re out of likes for today. They refresh within 24 hours.');
+    showSnack(context, outMessage);
     return;
   }
+  final rewardSwipes = (allowance['reward_swipes'] as num?)?.toInt() ?? 20;
 
   final watch = await showDialog<bool>(
     context: context,
     builder: (context) => AlertDialog(
       icon: const Icon(Icons.favorite_rounded),
-      title: const Text('Out of likes'),
+      title: Text('Out of $outOf'),
       content: Text(
-        'Watch a short ad to get ${AdsConfig.rewardLikes} more likes today '
-        '(${allowance['rewarded_ads_left']} left today). Or wait: your likes refresh within 24 hours.',
+        'Watch a short ad to get ${AdsConfig.rewardLikes} more likes and $rewardSwipes more swipes today '
+        '(${allowance['rewarded_ads_left']} ads left today). Or wait: they refresh within 24 hours.',
       ),
       actions: [
         TextButton(onPressed: () => Navigator.pop(context, false), child: const Text('Not now')),
@@ -99,10 +103,12 @@ Future<void> offerRewardedLikes(BuildContext context, WidgetRef ref) async {
     try {
       final now = Map<String, dynamic>.from(await client.rpc('get_like_allowance') as Map);
       if (((now['limit'] as num?)?.toInt() ?? 0) > before) {
-        if (context.mounted) showSnack(context, 'You got ${now['limit'] - before} more likes!');
+        if (context.mounted) {
+          showSnack(context, 'You got ${now['limit'] - before} more likes and $rewardSwipes more swipes!');
+        }
         return;
       }
     } catch (_) {}
   }
-  if (context.mounted) showSnack(context, 'Thanks! Your extra likes will appear shortly.');
+  if (context.mounted) showSnack(context, 'Thanks! Your extra likes and swipes will appear shortly.');
 }

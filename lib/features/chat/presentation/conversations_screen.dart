@@ -212,16 +212,20 @@ class _ConversationsScreenState extends ConsumerState<ConversationsScreen> {
                         matchedMessage: hit?.body,
                         onLongPress: () => showConversationActions(context, ref, c),
                       );
-                      // One paced "Sponsored" card after the third chat (not while searching).
-                      if (i != 2 || searching) return tile;
-                      return Column(
-                        children: [
-                          tile,
-                          const NativeAdCard(
-                            padding: EdgeInsets.symmetric(horizontal: AppSpacing.md, vertical: AppSpacing.sm),
-                          ),
-                        ],
-                      );
+                      // A paced "Sponsored" card after the third chat, then a small
+                      // banner after every 5th (never while searching, never after the last).
+                      if (searching || i == chats.length - 1) return tile;
+                      final Widget? ad = i == 2
+                          ? const NativeAdCard(
+                              padding: EdgeInsets.symmetric(horizontal: AppSpacing.md, vertical: AppSpacing.sm),
+                            )
+                          : (i + 1) % 5 == 0
+                          ? const InlineBannerAd(
+                              padding: EdgeInsets.symmetric(horizontal: AppSpacing.md, vertical: AppSpacing.sm),
+                            )
+                          : null;
+                      if (ad == null) return tile;
+                      return Column(children: [tile, ad]);
                     },
                   ),
                 // Room for the glass tab bar.

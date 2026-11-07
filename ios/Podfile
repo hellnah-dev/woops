@@ -41,6 +41,11 @@ post_install do |installer|
     flutter_additional_ios_build_settings(target)
     # permission_handler: compile in only the permissions Woops uses.
     target.build_configurations.each do |config|
+      # Xcode 27 builds for iOS 15+ only; older targets in some pods fail.
+      config.build_settings['IPHONEOS_DEPLOYMENT_TARGET'] = '15.0'
+      config.build_settings['EXCLUDED_ARCHS[sdk=iphonesimulator*]'] = 'x86_64'
+      # google_mobile_ads includes a private SDK header that Xcode 27 rejects by default.
+      config.build_settings['CLANG_ALLOW_NON_MODULAR_INCLUDES_IN_FRAMEWORK_MODULES'] = 'YES'
       config.build_settings['GCC_PREPROCESSOR_DEFINITIONS'] ||= ['$(inherited)']
       config.build_settings['GCC_PREPROCESSOR_DEFINITIONS'] += [
         'PERMISSION_CAMERA=1',

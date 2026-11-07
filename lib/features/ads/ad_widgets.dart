@@ -81,7 +81,10 @@ class _BannerAdSlotState extends ConsumerState<BannerAdSlot> {
   @override
   Widget build(BuildContext context) {
     final ready = ref.watch(adsReadyProvider);
-    if (!ready || !AdsConfig.bannersEnabled) return const SizedBox.shrink();
+    // Banners only from day [AdsConfig.strongAdsFromDay] of use.
+    if (!ready || !AdsConfig.bannersEnabled || !ref.watch(adPacerProvider).strongAdsAllowed) {
+      return const SizedBox.shrink();
+    }
     return LayoutBuilder(
       builder: (context, constraints) {
         _load(constraints.maxWidth);
@@ -260,6 +263,112 @@ class DeckAdCard extends StatelessWidget {
               onPressed: onContinue,
               icon: const Icon(Icons.arrow_forward_rounded),
               label: const Text('Continue to profiles'),
+            ),
+          ),
+        ],
+      ),
+    );
+  }
+}
+
+/// A grid split into blocks of [every] items with a paced "Sponsored" card
+/// between blocks (never after the last one). Pacing decides whether each
+/// card actually shows, so a long list never turns into a wall of ads.
+List<Widget> adSpacedGrid({
+  required int itemCount,
+  required SliverGridDelegate gridDelegate,
+  required IndexedWidgetBuilder itemBuilder,
+  required EdgeInsets padding,
+  int every = 8,
+}) {
+  final slivers = <Widget>[];
+  for (var start = 0; start < itemCount; start += every) {
+    final count = (itemCount - start).clamp(0, every);
+    final first = start == 0, last = start + count >= itemCount;
+    slivers.add(
+      SliverPadding(
+        padding: padding.copyWith(top: first ? padding.top : 0, bottom: last ? padding.bottom : 12),
+        sliver: SliverGrid.builder(
+          itemCount: count,
+          gridDelegate: gridDelegate,
+          itemBuilder: (context, i) => itemBuilder(context, start + i),
+        ),
+      ),
+    );
+    if (!last) {
+      slivers.add(
+        SliverToBoxAdapter(
+          child: NativeAdCard(
+            key: ValueKey('grid-ad-$start'),
+            padding: EdgeInsets.fromLTRB(padding.left, 0, padding.right, 12),
+          ),
+        ),
+      );
+    }
+  }
+  return slivers;
+}
+
+/// A standard banner between items in a list (e.g. every few chats), with
+/// the "Sponsored" label. Collapses to nothing if no ad loads.
+class InlineBannerAd extends ConsumerStatefulWidget {
+  const InlineBannerAd({super.key, this.padding = EdgeInsets.zero});
+  final EdgeInsetsGeometry padding;
+
+  @override
+  ConsumerState<InlineBannerAd> createState() => _InlineBannerAdState();
+}
+
+class _InlineBannerAdState extends ConsumerState<InlineBannerAd> with AutomaticKeepAliveClientMixin {
+  BannerAd? _ad;
+  bool _loaded = false;
+
+  @override
+  bool get wantKeepAlive => _loaded;
+
+  void _load() {
+    final unit = AdsConfig.bannerUnitId;
+    if (_ad != null || unit == null) return;
+    _ad = BannerAd(
+      adUnitId: unit,
+      size: AdSize.banner,
+      request: const AdRequest(),
+      listener: BannerAdListener(
+        onAdLoaded: (_) {
+          if (!mounted) return;
+          setState(() => _loaded = true);
+          updateKeepAlive();
+        },
+        onAdFailedToLoad: (ad, _) => ad.dispose(),
+      ),
+    )..load();
+  }
+
+  @override
+  void dispose() {
+    _ad?.dispose();
+    super.dispose();
+  }
+
+  @override
+  Widget build(BuildContext context) {
+    super.build(context);
+    final allowed =
+        ref.watch(adsReadyProvider) && AdsConfig.bannersEnabled && ref.watch(adPacerProvider).strongAdsAllowed;
+    if (!allowed) return const SizedBox.shrink();
+    _load();
+    final ad = _ad;
+    if (!_loaded || ad == null) return const SizedBox.shrink();
+    return Padding(
+      padding: widget.padding,
+      child: Column(
+        children: [
+          const _SponsoredLabel(),
+          Center(
+            child: SizedBox(
+              width: ad.size.width.toDouble(),
+              height: ad.size.height.toDouble(),
+              child: AdWidget(ad: ad),
             ),
           ),
         ],

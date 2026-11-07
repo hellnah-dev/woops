@@ -1,12 +1,12 @@
+import 'package:cached_network_image/cached_network_image.dart';
 import 'package:flutter/material.dart';
 import 'package:flutter/services.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
 import 'package:go_router/go_router.dart';
-import 'package:image_picker/image_picker.dart';
-import 'package:shared_preferences/shared_preferences.dart';
 
-import '../../../core/permissions/permission_gate.dart';
 import '../../../core/router/app_router.dart';
+import '../../../core/utils/app_exception.dart';
+import '../../../core/supabase/supabase_providers.dart';
 import '../../../core/theme/app_colors.dart';
 import '../../../core/utils/time_format.dart';
 import '../../../core/widgets/love_ui.dart';
@@ -21,6 +21,7 @@ import '../data/local_chat_store.dart';
 import 'chat_layout.dart';
 import 'conversation_actions.dart';
 import 'linkified_text.dart';
+import 'gif_picker.dart';
 import 'view_once_viewer.dart';
 import '../domain/chat_models.dart';
 
@@ -96,6 +97,7 @@ class _ChatViewState extends ConsumerState<_ChatView> {
   @override
   void initState() {
     super.initState();
+    _loadMyFlag();
     // While this chat is open, new messages in it don't trigger a top banner.
     WidgetsBinding.instance.addPostFrameCallback((_) => _active.state = widget.conversationId);
     // Lets the other person see "typing…" (nothing is stored).
@@ -142,125 +144,58 @@ class _ChatViewState extends ConsumerState<_ChatView> {
     }
   }
 
-  /// First time someone sends media: explain view-once, so nobody is surprised.
-  Future<bool> _explainViewOnce() async {
-    try {
-      final prefs = await SharedPreferences.getInstance();
-      if (prefs.getBool('view_once_explained') ?? false) return true;
-      if (!mounted) return false;
-      final ok = await showDialog<bool>(
-        context: context,
-        builder: (context) => AlertDialog(
-          icon: const Icon(Icons.looks_one_outlined, size: 34),
-          title: const Text('Photos and videos are view once'),
-          content: const Text(
-            '• Your match can open each photo or video one time. It disappears when they close it.\n'
-            '• It’s compressed and end-to-end encrypted on your phone. Our servers only hold the encrypted file '
-            'until it’s delivered, then delete it (if it’s never picked up, after 30 days).\n'
-            '• Your phone doesn’t keep a copy after sending.\n'
-            '• On Android, screenshots are blocked while it’s open.',
-          ),
-          actions: [
-            TextButton(onPressed: () => Navigator.pop(context, false), child: const Text('Cancel')),
-            FilledButton(
-              style: FilledButton.styleFrom(minimumSize: const Size(100, 44)),
-              onPressed: () => Navigator.pop(context, true),
-              child: const Text('Got it'),
-            ),
-          ],
-        ),
-      );
-      if (ok == true) await prefs.setBool('view_once_explained', true);
-      return ok == true;
-    } catch (_) {
-      return true;
+  /// Chats are GIF-only, like Tinder: no photos or videos.
+  Future<void> _sendGif() async {
+    final gif = await pickGif(context);
+    if (gif == null || !mounted) return;
+    await ref.read(chatControllerProvider(_key).notifier).sendGif(gif);
+    noteSupportMessageSent();
+    if (_scroll.hasClients) {
+      _scroll.animateTo(0, duration: const Duration(milliseconds: 200), curve: Curves.easeOut);
     }
-  }
-
-  /// Camera button: take a photo or record. Gallery button: pick photos or a video.
-  Future<void> _pickMedia({required bool camera}) async {
-    final choice = await showModalBottomSheet<String>(
-      // Over the whole screen, never under the glass tab bar.
-      useRootNavigator: true,
-      context: context,
-      builder: (context) => SafeArea(
-        child: Column(
-          mainAxisSize: MainAxisSize.min,
-          children: [
-            const ListTile(
-              dense: true,
-              leading: Icon(Icons.looks_one_outlined),
-              title: Text('Sent as view once · encrypted · deleted once delivered'),
-            ),
-            if (camera) ...[
-              ListTile(
-                leading: const Icon(Icons.photo_camera_outlined),
-                title: const Text('Take a photo'),
-                onTap: () => Navigator.pop(context, 'camera'),
-              ),
-              ListTile(
-                leading: const Icon(Icons.videocam_outlined),
-                title: const Text('Record a video'),
-                subtitle: const Text('Up to 30 seconds'),
-                onTap: () => Navigator.pop(context, 'record'),
-              ),
-            ] else ...[
-              ListTile(
-                leading: const Icon(Icons.photo_library_outlined),
-                title: const Text('Photos'),
-                subtitle: const Text('Choose up to 10'),
-                onTap: () => Navigator.pop(context, 'photos'),
-              ),
-              ListTile(
-                leading: const Icon(Icons.video_library_outlined),
-                title: const Text('Video'),
-                subtitle: const Text('Up to 30 seconds'),
-                onTap: () => Navigator.pop(context, 'video'),
-              ),
-            ],
-          ],
-        ),
-      ),
-    );
-    if (choice == null || !mounted) return;
-    if (!await _explainViewOnce() || !mounted) return;
-    if (!await PermissionGate.request(context, camera ? AppPermission.camera : AppPermission.photos) || !mounted) {
-      return;
-    }
-    final picker = ImagePicker();
-    final items = <OutgoingMedia>[];
-    try {
-      switch (choice) {
-        case 'photos':
-          final files = await picker.pickMultiImage(maxWidth: 2400, imageQuality: 90, limit: 10);
-          items.addAll(files.take(10).map((f) => OutgoingMedia.imageFile(f.path)));
-        case 'camera':
-          final f = await picker.pickImage(source: ImageSource.camera, maxWidth: 2400, imageQuality: 90);
-          if (f != null) items.add(OutgoingMedia.imageFile(f.path));
-        case 'video':
-        case 'record':
-          final f = await picker.pickVideo(
-            source: choice == 'record' ? ImageSource.camera : ImageSource.gallery,
-            maxDuration: const Duration(seconds: 30),
-          );
-          if (f != null) items.add(OutgoingMedia.video(f.path));
-      }
-    } catch (_) {
-      if (mounted) showSnack(context, 'Couldn’t open your ${camera ? 'camera' : 'gallery'}.', isError: true);
-      return;
-    }
-    if (items.isEmpty || !mounted) return;
-    if (items.length > 1) showSnack(context, 'Sending ${items.length} photos…');
-    await ref.read(chatControllerProvider(_key).notifier).sendMedia(items);
-    final error = ref.read(chatControllerProvider(_key)).error;
-    if (error != null && mounted) showSnack(context, error.message, isError: true);
   }
 
   void _openProfile() => context.push(Routes.user(widget.args.otherUserId));
 
+  /// The green/red flag I gave this person (only I and the server know it).
+  String? _myFlag;
+
+  Future<void> _loadMyFlag() async {
+    try {
+      final flag = await ref
+          .read(supabaseClientProvider)
+          .rpc('get_my_flag_for', params: {'p_target': widget.args.otherUserId});
+      if (mounted) setState(() => _myFlag = flag as String?);
+    } catch (_) {}
+  }
+
+  Future<void> _setFlag(String? kind) async {
+    final name = widget.args.otherName;
+    try {
+      await ref
+          .read(supabaseClientProvider)
+          .rpc('set_profile_flag', params: {'p_target': widget.args.otherUserId, 'p_kind': kind});
+      if (!mounted) return;
+      setState(() => _myFlag = kind);
+      showSnack(context, switch (kind) {
+        'green' => 'You gave $name a green flag 💚. Only they see the count.',
+        'red' => 'You gave $name a red flag 🚩. Only they see the count. To report something serious, use Report.',
+        _ => 'Your flag for $name was taken back.',
+      });
+    } catch (e) {
+      if (mounted) showSnack(context, AppException.from(e).message, isError: true);
+    }
+  }
+
   Future<void> _menu(String action) async {
     final name = widget.args.otherName;
     switch (action) {
+      case 'green':
+        await _setFlag(_myFlag == 'green' ? null : 'green');
+      case 'red':
+        await _setFlag(_myFlag == 'red' ? null : 'red');
+      case 'unflag':
+        await _setFlag(null);
       case 'profile':
         _openProfile();
       case 'delete':
@@ -298,7 +233,7 @@ class _ChatViewState extends ConsumerState<_ChatView> {
               ),
             ),
             _ReactionPicker(selected: myReaction, onPick: (e) => Navigator.pop(context, 'react:$e')),
-            if (!m.kind.isMedia)
+            if (m.kind == MessageKind.text)
               ListTile(
                 leading: const Icon(Icons.copy_rounded),
                 title: const Text('Copy text'),
@@ -385,6 +320,7 @@ class _ChatViewState extends ConsumerState<_ChatView> {
           photo: widget.args.otherPhoto,
           onTap: _openProfile,
           onMenu: _menu,
+          myFlag: _myFlag,
         ),
         body: SafeArea(
           top: false,
@@ -511,12 +447,7 @@ class _ChatViewState extends ConsumerState<_ChatView> {
                     ? _TypingBubble(photo: widget.args.otherPhoto, name: widget.args.otherName)
                     : const SizedBox(width: double.infinity),
               ),
-              _Composer(
-                controller: _input,
-                onSend: _send,
-                onCamera: () => _pickMedia(camera: true),
-                onGallery: () => _pickMedia(camera: false),
-              ),
+              _Composer(controller: _input, onSend: _send, onGif: _sendGif),
             ],
           ),
         ),
@@ -527,7 +458,10 @@ class _ChatViewState extends ConsumerState<_ChatView> {
 
 /// Instagram-style top bar: avatar, name and a quiet encryption note.
 class _ChatHeader extends StatelessWidget implements PreferredSizeWidget {
-  const _ChatHeader({required this.name, required this.photo, required this.onTap, required this.onMenu});
+  const _ChatHeader({required this.name, required this.photo, required this.onTap, required this.onMenu, this.myFlag});
+
+  /// 'green', 'red' or null: the flag I gave this person.
+  final String? myFlag;
   final String name;
   final String? photo;
   final VoidCallback onTap;
@@ -589,12 +523,16 @@ class _ChatHeader extends StatelessWidget implements PreferredSizeWidget {
           tooltip: 'More',
           icon: const Icon(Icons.more_horiz_rounded),
           onSelected: onMenu,
-          itemBuilder: (_) => const [
-            PopupMenuItem(value: 'profile', child: Text('View profile')),
-            PopupMenuItem(value: 'delete', child: Text('Delete chat history')),
-            PopupMenuItem(value: 'unmatch', child: Text('Unmatch')),
-            PopupMenuItem(value: 'block', child: Text('Block')),
-            PopupMenuItem(value: 'report', child: Text('Report')),
+          itemBuilder: (_) => [
+            CheckedPopupMenuItem(value: 'green', checked: myFlag == 'green', child: const Text('Give a green flag 💚')),
+            CheckedPopupMenuItem(value: 'red', checked: myFlag == 'red', child: const Text('Give a red flag 🚩')),
+            if (myFlag != null) const PopupMenuItem(value: 'unflag', child: Text('Take back my flag')),
+            const PopupMenuDivider(),
+            const PopupMenuItem(value: 'profile', child: Text('View profile')),
+            const PopupMenuItem(value: 'delete', child: Text('Delete chat history')),
+            const PopupMenuItem(value: 'unmatch', child: Text('Unmatch')),
+            const PopupMenuItem(value: 'block', child: Text('Block')),
+            const PopupMenuItem(value: 'report', child: Text('Report')),
           ],
         ),
       ],
@@ -800,11 +738,32 @@ class _MessageRow extends StatelessWidget {
             bottomLeft: joinedBelow ? small : big,
           );
 
-    final emoji = !message.kind.isMedia && isBigEmoji(message.body);
+    final emoji = message.kind == MessageKind.text && isBigEmoji(message.body);
+    final gif = message.kind == MessageKind.gif ? GifPayload.tryParse(message.body) : null;
     final fg = failed ? theme.colorScheme.onErrorContainer : (mine ? Colors.white : theme.colorScheme.onSurface);
 
     Widget bubble;
-    if (emoji) {
+    if (gif != null) {
+      // A GIF shows on its own, like a big emoji, with the bubble's corners.
+      bubble = ClipRRect(
+        borderRadius: radius,
+        child: SizedBox(
+          width: 220,
+          child: AspectRatio(
+            aspectRatio: gif.aspectRatio,
+            child: CachedNetworkImage(
+              imageUrl: gif.url,
+              fit: BoxFit.cover,
+              placeholder: (_, _) => ColoredBox(color: theme.colorScheme.surfaceContainerHighest),
+              errorWidget: (_, _, _) => ColoredBox(
+                color: theme.colorScheme.surfaceContainerHighest,
+                child: const Center(child: Text('GIF')),
+              ),
+            ),
+          ),
+        ),
+      );
+    } else if (emoji) {
       bubble = Padding(
         padding: const EdgeInsets.symmetric(horizontal: 2, vertical: 2),
         child: Text(message.body!.trim(), style: const TextStyle(fontSize: 42, height: 1.15)),
@@ -984,12 +943,11 @@ class _ViewOnceTile extends StatelessWidget {
 
 /// Instagram-style pill: camera on the left, gallery or "Send" on the right.
 class _Composer extends StatelessWidget {
-  const _Composer({required this.controller, required this.onSend, required this.onCamera, required this.onGallery});
+  const _Composer({required this.controller, required this.onSend, required this.onGif});
 
   final TextEditingController controller;
   final VoidCallback onSend;
-  final VoidCallback onCamera;
-  final VoidCallback onGallery;
+  final VoidCallback onGif;
 
   @override
   Widget build(BuildContext context) {
@@ -1008,16 +966,21 @@ class _Composer extends StatelessWidget {
             children: [
               Semantics(
                 button: true,
-                label: 'Camera',
+                label: 'Send a GIF',
                 child: Tooltip(
-                  message: 'Camera',
+                  message: 'Send a GIF',
                   child: PressableScale(
-                    onTap: onCamera,
+                    key: const Key('chat-gif'),
+                    onTap: onGif,
                     child: Container(
                       width: 40,
                       height: 40,
+                      alignment: Alignment.center,
                       decoration: const BoxDecoration(shape: BoxShape.circle, gradient: AppColors.brandGradient),
-                      child: const Icon(Icons.photo_camera_rounded, color: Colors.white, size: 21),
+                      child: const Text(
+                        'GIF',
+                        style: TextStyle(color: Colors.white, fontWeight: FontWeight.w900, fontSize: 13),
+                      ),
                     ),
                   ),
                 ),
@@ -1063,12 +1026,7 @@ class _Composer extends StatelessWidget {
                             ),
                             child: const Text('Send', semanticsLabel: 'Send'),
                           )
-                        : IconButton(
-                            key: const ValueKey('gallery'),
-                            tooltip: 'Photos and videos',
-                            onPressed: onGallery,
-                            icon: const Icon(Icons.photo_outlined),
-                          ),
+                        : const SizedBox(key: ValueKey('idle'), width: 8, height: 40),
                   );
                 },
               ),
@@ -1092,22 +1050,24 @@ class _MessageEntrance extends StatefulWidget {
 }
 
 class _MessageEntranceState extends State<_MessageEntrance> with SingleTickerProviderStateMixin {
-  late final AnimationController _controller = AnimationController(
-    vsync: this,
-    duration: const Duration(milliseconds: 240),
-    value: widget.animate ? 0 : 1,
-  );
-  late final Animation<double> _curve = CurvedAnimation(parent: _controller, curve: Curves.easeOutCubic);
+  // Only new messages animate; history never creates a controller (creating
+  // one later, e.g. in dispose, would look up a ticker on a dead element).
+  AnimationController? _controller;
+  late final Animation<double> _curve;
 
   @override
   void initState() {
     super.initState();
-    if (widget.animate) _controller.forward();
+    if (widget.animate) {
+      final c = _controller = AnimationController(vsync: this, duration: const Duration(milliseconds: 240));
+      _curve = CurvedAnimation(parent: c, curve: Curves.easeOutCubic);
+      c.forward();
+    }
   }
 
   @override
   void dispose() {
-    _controller.dispose();
+    _controller?.dispose();
     super.dispose();
   }
 
@@ -1115,7 +1075,7 @@ class _MessageEntranceState extends State<_MessageEntrance> with SingleTickerPro
   Widget build(BuildContext context) {
     // History never animates, so skip the transition layers for it entirely.
     // (animate is fixed per message, so the tree shape never changes.)
-    if (!widget.animate) return widget.child;
+    if (_controller == null) return widget.child;
     return FadeTransition(
       opacity: _curve,
       child: SlideTransition(

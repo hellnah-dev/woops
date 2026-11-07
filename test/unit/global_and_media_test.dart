@@ -27,7 +27,9 @@ void main() {
     test('km for most regions, miles for US/GB/LR/MM', () {
       expect(DistanceUnits.away(5, regionCode: 'NP'), '5 km away');
       expect(DistanceUnits.away(5, regionCode: 'US'), '4 mi away');
-      expect(DistanceUnits.away(1, regionCode: 'GB'), '1 mi away');
+      expect(DistanceUnits.away(1, regionCode: 'GB'), 'Less than 2 mi away');
+      expect(DistanceUnits.away(2, regionCode: 'NP'), 'Less than 2 km away');
+      expect(DistanceUnits.away(3, regionCode: 'NP'), '3 km away');
     });
 
     test('limit labels include Anywhere', () {

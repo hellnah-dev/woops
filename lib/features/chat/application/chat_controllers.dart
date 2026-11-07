@@ -409,7 +409,7 @@ class ChatController extends AutoDisposeFamilyNotifier<ChatState, ChatArgs> {
 
   /// Sends a text message with an optimistic bubble. Retrying a failed message
   /// reuses its client id, so the other phone never shows it twice.
-  Future<void> send(String text, {String? clientId}) async {
+  Future<void> send(String text, {String? clientId, MessageKind kind = MessageKind.text}) async {
     final body = text.trim();
     final me = myId;
     if (body.isEmpty || me == null) return;
@@ -421,7 +421,7 @@ class ChatController extends AutoDisposeFamilyNotifier<ChatState, ChatArgs> {
       conversationId: arg.conversationId,
       senderId: me,
       clientId: id,
-      kind: MessageKind.text,
+      kind: kind,
       body: body,
       createdAt: DateTime.now().toUtc(),
       delivery: DeliveryState.sending,
@@ -438,7 +438,7 @@ class ChatController extends AutoDisposeFamilyNotifier<ChatState, ChatArgs> {
       final wire = e2e
           ? await crypto.encrypt(body, conversationId: arg.conversationId, otherUserId: arg.otherUserId)
           : body;
-      final sent = await _repo.sendMessage(arg.conversationId, wire, clientId: id, encrypted: e2e);
+      final sent = await _repo.sendMessage(arg.conversationId, wire, clientId: id, kind: kind, encrypted: e2e);
       final saved = sent.copyWith(body: body, encrypted: e2e); // keep the readable copy locally
       state = state.copyWith(messages: mergeMessages(state.messages, [saved]));
       await _store.upsert(arg.conversationId, [saved]);
@@ -454,7 +454,10 @@ class ChatController extends AutoDisposeFamilyNotifier<ChatState, ChatArgs> {
 
   Future<void> retry(ChatMessage failed) => failed.kind.isMedia && failed.localPath != null
       ? _sendMedia(failed.localPath!, kind: failed.kind, clientId: failed.clientId)
-      : send(failed.body ?? '', clientId: failed.clientId);
+      : send(failed.body ?? '', clientId: failed.clientId, kind: failed.kind);
+
+  /// Sends a GIF (its GIPHY link, end-to-end encrypted like text).
+  Future<void> sendGif(GifPayload gif) => send(gif.encode(), kind: MessageKind.gif);
 
   /// Convenience for a single photo.
   Future<void> sendPhoto(Uint8List original) => sendMedia([OutgoingMedia.image(original)]);
@@ -518,7 +521,7 @@ class ChatController extends AutoDisposeFamilyNotifier<ChatState, ChatArgs> {
       final usage = await _repo.mediaUsage();
       if (usage.used + sealed.bytes.length > usage.limit) {
         throw const AppException(
-          'You’ve used your 5 MB of media. Wait until your matches open what you sent, or remove a profile photo.',
+          'You’ve used your 3 MB of media. Wait until your matches open what you sent, or remove a profile photo.',
           code: 'media_quota',
         );
       }

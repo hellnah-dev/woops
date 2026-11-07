@@ -3,6 +3,7 @@ import 'package:flutter_riverpod/flutter_riverpod.dart';
 import '../../../core/supabase/supabase_providers.dart';
 import '../../chat/application/chat_controllers.dart';
 import '../../chat/domain/chat_models.dart';
+import '../../../core/i18n/units.dart';
 import '../../profile/domain/profile_enums.dart';
 
 /// What someone is here for, grouped the way people talk about it.
@@ -34,14 +35,17 @@ class MatchInsight {
 
   MatchMode get mode => MatchMode.of(intention);
 
-  /// "3 in common · 12 km", or null when there's nothing to say.
-  String? get summary {
+  /// "3 in common · 12 km", or null when there's nothing to say. Close
+  /// matches read "Less than 2 km", like on profile cards.
+  String? summaryFor({String? regionCode}) {
     final parts = [
       if (sharedInterests.isNotEmpty) '${sharedInterests.length} in common',
-      if (distanceKm != null) '$distanceKm km',
+      if (distanceKm != null) DistanceUnits.short(distanceKm!, regionCode: regionCode),
     ];
     return parts.isEmpty ? null : parts.join(' · ');
   }
+
+  String? get summary => summaryFor();
 
   factory MatchInsight.fromJson(Map<String, dynamic> j) => MatchInsight(
     intention: Intention.fromValue(j['intention'] as String? ?? 'figuring_out'),

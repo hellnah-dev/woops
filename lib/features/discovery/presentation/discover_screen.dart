@@ -108,6 +108,8 @@ class _DiscoverScreenState extends ConsumerState<DiscoverScreen> {
         if (mounted) showSnack(context, 'Finish your profile to start matching', isError: true);
       } else if (error.code == 'rate_limited' && error.message.toLowerCase().contains('out of likes')) {
         await offerRewardedLikes(context, ref);
+      } else if (error.code == 'rate_limited' && error.message.toLowerCase().contains('out of swipes')) {
+        await offerRewardedLikes(context, ref, swipes: true);
       } else {
         showSnack(context, error.message, isError: true);
       }
@@ -152,7 +154,6 @@ class _DiscoverScreenState extends ConsumerState<DiscoverScreen> {
           ],
         ),
         actions: [
-          IconButton(tooltip: 'Map', icon: const Icon(Icons.map_outlined), onPressed: () => context.push(Routes.map)),
           IconButton(
             tooltip: 'Filters',
             icon: const Icon(Icons.tune_rounded),

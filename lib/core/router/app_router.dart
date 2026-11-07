@@ -11,14 +11,12 @@ import '../../features/chat/presentation/conversations_screen.dart';
 import '../../features/discovery/presentation/discover_screen.dart';
 import '../../features/legal/legal_screen.dart';
 import '../../features/likes/presentation/likes_screen.dart';
-import '../../features/map/map_screen.dart';
 import '../../features/matches/presentation/matches_screen.dart';
 import '../../features/notifications/activity_screen.dart';
 import '../../features/permissions/permissions_screen.dart';
 import '../../features/onboarding/presentation/onboarding_screen.dart';
 import '../../features/profile/application/profile_providers.dart';
 import '../../features/profile/domain/profile_models.dart';
-import '../../features/profile/presentation/age_verification_screen.dart';
 import '../../features/profile/presentation/edit_profile_screen.dart';
 import '../../features/profile/presentation/my_profile_screen.dart';
 import '../../features/profile/presentation/profile_detail_screen.dart';
@@ -44,8 +42,6 @@ class Routes {
   static const profile = '/profile';
   static const editProfile = '/profile/edit';
   static const verify = '/profile/verify';
-  static const ageCheck = '/profile/age';
-  static const map = '/map';
   static const activity = '/activity';
   static const permissions = '/permissions';
   static const settings = '/settings';
@@ -178,12 +174,6 @@ final routerProvider = Provider<GoRouter>((ref) {
         ],
       ),
       GoRoute(path: Routes.verify, parentNavigatorKey: rootNavigatorKey, builder: (_, _) => const VerificationScreen()),
-      GoRoute(
-        path: Routes.ageCheck,
-        parentNavigatorKey: rootNavigatorKey,
-        builder: (_, _) => const AgeVerificationScreen(),
-      ),
-      GoRoute(path: Routes.map, parentNavigatorKey: rootNavigatorKey, builder: (_, _) => const MapScreen()),
       GoRoute(path: Routes.activity, parentNavigatorKey: rootNavigatorKey, builder: (_, _) => const ActivityScreen()),
       GoRoute(
         path: Routes.permissions,

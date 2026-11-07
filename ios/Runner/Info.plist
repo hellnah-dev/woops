@@ -49,11 +49,13 @@
 	<key>LSRequiresIPhoneOS</key>
 	<true/>
 	<key>NSCameraUsageDescription</key>
-	<string>Woops uses the camera so you can take profile photos.</string>
+	<string>Woops uses the camera so you can take profile photos, moments, and photos or videos to send in chat.</string>
 	<key>NSLocationWhenInUseUsageDescription</key>
 	<string>Woops uses your approximate location to show people near you. Your exact location is never shared.</string>
+	<key>NSMicrophoneUsageDescription</key>
+	<string>Woops uses the microphone to record sound in videos you send in chat.</string>
 	<key>NSPhotoLibraryUsageDescription</key>
-	<string>Woops needs access to your photos so you can add them to your profile.</string>
+	<string>Woops needs access to your photos so you can add them to your profile, your moments, and your chats.</string>
 	<key>NSUserTrackingUsageDescription</key>
 	<string>Woops uses this to show you more relevant ads. You can say no and still use every feature.</string>
 	<key>SKAdNetworkItems</key>

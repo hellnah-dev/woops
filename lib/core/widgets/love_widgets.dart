@@ -127,10 +127,11 @@ class Wordmark extends StatelessWidget {
   Widget build(BuildContext context) {
     return ShaderMask(
       shaderCallback: (rect) => AppColors.brandGradient.createShader(rect),
-      // The script font's descenders (the "p") hang below the line box; the
-      // padding makes the mask cover them so they aren't drawn plain white.
+      // The gradient only colours what's inside this box, and the script
+      // font's "p" hangs far below the line: the padding must reach its tip,
+      // or the tip is drawn plain white.
       child: Padding(
-        padding: EdgeInsets.only(bottom: size * 0.2),
+        padding: EdgeInsets.only(bottom: size * 0.45),
         child: Text(
           text,
           style: TextStyle(fontFamily: AppFonts.script, fontSize: size, color: Colors.white, height: 1.25),

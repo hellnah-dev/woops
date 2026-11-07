@@ -34,6 +34,11 @@ class Env {
   static const firebaseIosAppId = String.fromEnvironment('FIREBASE_IOS_APP_ID');
   static const firebaseIosBundleId = String.fromEnvironment('FIREBASE_IOS_BUNDLE_ID', defaultValue: 'com.woops.app');
 
+  /// GIPHY API key for GIFs in chat (developers.giphy.com → Create an App →
+  /// API). Public by design (it ships in the app). Empty: the GIF button says
+  /// GIFs aren't set up yet.
+  static const giphyApiKey = String.fromEnvironment('GIPHY_API_KEY');
+
   // Legal / support links shown in the app.
   static const termsUrl = String.fromEnvironment('TERMS_URL', defaultValue: 'https://example.com/terms');
   static const privacyUrl = String.fromEnvironment('PRIVACY_URL', defaultValue: 'https://example.com/privacy');

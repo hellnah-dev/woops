@@ -7,6 +7,7 @@ import '../../../core/theme/app_colors.dart';
 import '../../../core/widgets/profile_photo.dart';
 import '../../../core/widgets/state_views.dart';
 import '../../ads/ad_widgets.dart';
+import '../../ads/daily_unlock.dart';
 import '../../discovery/application/discovery_controller.dart';
 import '../../discovery/data/discovery_repository.dart';
 import '../../discovery/presentation/match_flow.dart';
@@ -65,22 +66,28 @@ class LikesScreen extends ConsumerWidget {
                     ),
                   ],
                 )
-              : CustomScrollView(
-                  slivers: [
-                    SliverPadding(
-                      padding: const EdgeInsets.fromLTRB(AppSpacing.md, 0, AppSpacing.md, AppSpacing.sm),
-                      sliver: SliverToBoxAdapter(
-                        child: Text(
-                          '${cards.length} ${cards.length == 1 ? 'person likes' : 'people like'} you. '
-                          'Like them back to match.',
-                          style: Theme.of(context).textTheme.bodyLarge,
+              // One short ad a day opens Likes (from day 3 of use).
+              : DailyAdGate(
+                  feature: 'likes',
+                  icon: Icons.favorite_rounded,
+                  title: '${cards.length} ${cards.length == 1 ? 'person likes' : 'people like'} you',
+                  message: 'Watch one short ad to see who liked you today.',
+                  child: CustomScrollView(
+                    slivers: [
+                      SliverPadding(
+                        padding: const EdgeInsets.fromLTRB(AppSpacing.md, 0, AppSpacing.md, AppSpacing.sm),
+                        sliver: SliverToBoxAdapter(
+                          child: Text(
+                            '${cards.length} ${cards.length == 1 ? 'person likes' : 'people like'} you. '
+                            'Like them back to match.',
+                            style: Theme.of(context).textTheme.bodyLarge,
+                          ),
                         ),
                       ),
-                    ),
-                    SliverPadding(
-                      padding: const EdgeInsets.all(AppSpacing.md),
-                      sliver: SliverGrid.builder(
+                      // A paced ad card after every 8 people.
+                      ...adSpacedGrid(
                         itemCount: cards.length,
+                        padding: const EdgeInsets.all(AppSpacing.md),
                         gridDelegate: const SliverGridDelegateWithMaxCrossAxisExtent(
                           maxCrossAxisExtent: 220,
                           mainAxisSpacing: 12,
@@ -90,14 +97,16 @@ class LikesScreen extends ConsumerWidget {
                         itemBuilder: (context, i) =>
                             _LikeTile(card: cards[i], onTap: () => _open(context, ref, cards[i])),
                       ),
-                    ),
-                    // One paced "Sponsored" card below the likes (hidden when pacing says no).
-                    const SliverToBoxAdapter(
-                      child: NativeAdCard(padding: EdgeInsets.fromLTRB(AppSpacing.md, 0, AppSpacing.md, AppSpacing.lg)),
-                    ),
-                    // Room below for the glass tab bar.
-                    SliverToBoxAdapter(child: SizedBox(height: MediaQuery.paddingOf(context).bottom)),
-                  ],
+                      // One paced "Sponsored" card below the likes (hidden when pacing says no).
+                      const SliverToBoxAdapter(
+                        child: NativeAdCard(
+                          padding: EdgeInsets.fromLTRB(AppSpacing.md, 0, AppSpacing.md, AppSpacing.lg),
+                        ),
+                      ),
+                      // Room below for the glass tab bar.
+                      SliverToBoxAdapter(child: SizedBox(height: MediaQuery.paddingOf(context).bottom)),
+                    ],
+                  ),
                 ),
         ),
       ),

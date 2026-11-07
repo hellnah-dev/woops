@@ -39,7 +39,7 @@ final publicProfileProvider = FutureProvider.autoDispose.family<ProfileCard?, St
   return ref.watch(profileRepositoryProvider).fetchPublicProfile(userId);
 });
 
-/// My media on the server vs. the 5 MB allowance (profile + chat photos).
+/// My media on the server vs. the 3 MB allowance (profile and moment photos).
 final mediaUsageProvider = FutureProvider.autoDispose<({int used, int limit})>((ref) {
   ref.watch(currentUserIdProvider);
   ref.watch(myProfileProvider); // refresh when photos change

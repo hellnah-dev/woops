@@ -149,13 +149,6 @@ class NotificationCenter extends Notifier<List<ActivityItem>> {
         .onPostgresChanges(
           event: PostgresChangeEvent.update,
           schema: 'public',
-          table: 'age_verifications',
-          filter: filter,
-          callback: refresh,
-        )
-        .onPostgresChanges(
-          event: PostgresChangeEvent.update,
-          schema: 'public',
           table: 'verification_requests',
           filter: filter,
           callback: refresh,
@@ -195,7 +188,7 @@ class NotificationCenter extends Notifier<List<ActivityItem>> {
   /// arrived while the app was closed are announced on the next launch.
   Future<void> _onProfile(MyProfile p) async {
     final key = 'reviews_${p.id}';
-    final now = {'age': p.ageCheck.name, 'selfie': p.selfieStatus, 'verified': p.isVerified};
+    final now = {'selfie': p.selfieStatus, 'verified': p.isVerified};
     Map<String, dynamic>? before;
     try {
       final prefs = await SharedPreferences.getInstance();
@@ -208,31 +201,6 @@ class NotificationCenter extends Notifier<List<ActivityItem>> {
     if (before == null) return; // first run on this phone: nothing to announce
 
     final stamp = DateTime.now().millisecondsSinceEpoch;
-    if (before['age'] != p.ageCheck.name) {
-      if (p.ageCheck == AgeCheck.approved) {
-        add(
-          ActivityItem(
-            id: 'age-ok-$stamp',
-            type: ActivityType.system,
-            title: 'Age confirmed ✅',
-            body: 'Your account is approved. Your ID was checked and deleted. Happy matching!',
-            at: DateTime.now(),
-            route: Routes.discover,
-          ),
-        );
-      } else if (p.ageCheck == AgeCheck.rejected) {
-        add(
-          ActivityItem(
-            id: 'age-no-$stamp',
-            type: ActivityType.system,
-            title: 'ID not approved',
-            body: p.ageRejectReason ?? 'Please send a clearer photo of your ID.',
-            at: DateTime.now(),
-            route: Routes.ageCheck,
-          ),
-        );
-      }
-    }
     if (before['verified'] != true && p.isVerified) {
       add(
         ActivityItem(
@@ -288,7 +256,7 @@ class NotificationCenter extends Notifier<List<ActivityItem>> {
             id: 'msg-${c.conversationId}-${c.lastMessageAt?.microsecondsSinceEpoch}',
             type: ActivityType.message,
             title: c.otherDisplayName,
-            body: c.lastMessageBody ?? 'New message',
+            body: c.lastMessageBody == null ? 'New message' : c.previewFor(''),
             at: DateTime.now(),
             route: Routes.chat(c.conversationId),
             photo: c.otherPhoto,
@@ -331,7 +299,7 @@ class NotificationCenter extends Notifier<List<ActivityItem>> {
             id: 'remind-reply-${c.conversationId}-${c.lastMessageAt!.millisecondsSinceEpoch}',
             type: ActivityType.message,
             title: '${c.otherDisplayName} is waiting for your reply',
-            body: c.lastMessageBody ?? 'Pick up where you left off.',
+            body: c.lastMessageBody == null ? 'Pick up where you left off.' : c.previewFor(''),
             at: now,
             route: Routes.chat(c.conversationId),
             photo: c.otherPhoto,

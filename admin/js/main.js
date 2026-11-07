@@ -10,8 +10,9 @@ import * as reports from './views/reports.js';
 import * as users from './views/users.js';
 import * as verifications from './views/verifications.js';
 import * as ageChecks from './views/ageChecks.js';
+import * as redFlags from './views/redFlags.js';
 
-const routes = { dashboard, reports, verifications, 'age-checks': ageChecks, users, photos, errors, 'age-rules': ageRules, audit };
+const routes = { dashboard, reports, 'red-flags': redFlags, verifications, 'age-checks': ageChecks, users, photos, errors, 'age-rules': ageRules, audit };
 
 let config;
 try {

@@ -1,0 +1,11 @@
+{
+  "Simulator Target Bundle": "com.woops.app",
+  "aps": {
+    "alert": {
+      "title": "Test Bot Bina",
+      "body": "Hey! Coffee this weekend? ☕️"
+    },
+    "sound": "default",
+    "badge": 1
+  }
+}

@@ -16,7 +16,15 @@ class ErrorReporter {
     final previous = FlutterError.onError;
     FlutterError.onError = (details) {
       previous?.call(details);
-      report(details.exception, details.stack, context: {'library': details.library ?? ''});
+      // The full report names the widget and file that caused layout errors
+      // ("The relevant error-causing widget was: Column  lib/…:120"), which
+      // the one-line message doesn't.
+      final full = details.toString();
+      report(
+        details.exception,
+        details.stack,
+        context: {'library': details.library ?? '', 'details': full.length > 1500 ? full.substring(0, 1500) : full},
+      );
     };
     PlatformDispatcher.instance.onError = (error, stack) {
       report(error, stack);

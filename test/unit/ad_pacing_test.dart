@@ -67,4 +67,30 @@ void main() {
     );
     expect(p.canShow, isFalse);
   });
+
+  AdPacing used({required int activeDays, required int calendarDays}) {
+    final now = start.add(Duration(days: calendarDays, minutes: 10));
+    return AdPacing(
+      firstSeen: start,
+      sessionStart: now.subtract(const Duration(minutes: 10)),
+      clock: () => now,
+      activeDays: activeDays,
+      maxPer5Min: 5,
+      rampDays: 7,
+      graceSeconds: 60,
+    );
+  }
+
+  test('ads grow with days of actual use, not calendar days', () {
+    // Opened on only 2 days in a month: still a light ad level.
+    expect(used(activeDays: 2, calendarDays: 30).capPer5Min, 1);
+    // Used daily for 8 days: the full level.
+    expect(used(activeDays: 8, calendarDays: 7).capPer5Min, 5);
+  });
+
+  test('the daily unlock and banners start on the 3rd day of use', () {
+    expect(used(activeDays: 1, calendarDays: 0).strongAdsAllowed, isFalse);
+    expect(used(activeDays: 2, calendarDays: 20).strongAdsAllowed, isFalse);
+    expect(used(activeDays: 3, calendarDays: 2).strongAdsAllowed, isTrue);
+  });
 }

@@ -185,8 +185,6 @@ class PushService {
         router.go(Routes.matches);
       case 'like':
         router.go(Routes.likes);
-      case 'age_check':
-        router.push(Routes.ageCheck);
       case 'verification':
         router.push(Routes.verify);
     }

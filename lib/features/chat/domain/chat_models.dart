@@ -5,6 +5,9 @@ enum MessageKind {
   image,
   video,
 
+  /// A GIF from GIPHY: the body is a small JSON with its link and size.
+  gif,
+
   /// A reaction to another message. Relayed, then attached to that message on
   /// the phone; never shown as a message of its own.
   reaction,
@@ -236,6 +239,7 @@ class ConversationSummary {
     return switch (lastMessageKind) {
       MessageKind.image => '$prefix📷 Photo',
       MessageKind.video => '$prefix🎥 Video',
+      MessageKind.gif => '${prefix}GIF',
       MessageKind.system => lastMessageBody ?? '',
       null => 'Tap to keep chatting',
       _ => '$prefix${lastMessageBody ?? ''}',
@@ -257,4 +261,38 @@ class ConversationSummary {
     lastMessageAt: json['last_message_at'] == null ? null : DateTime.parse(json['last_message_at'] as String),
     unreadCount: (json['unread_count'] as num?)?.toInt() ?? 0,
   );
+}
+
+/// What a GIF message carries: GIPHY's link and the GIF's size.
+class GifPayload {
+  const GifPayload({required this.url, required this.width, required this.height, this.title = ''});
+  final String url;
+  final int width;
+  final int height;
+  final String title;
+
+  double get aspectRatio => width > 0 && height > 0 ? width / height : 1;
+
+  String encode() => jsonEncode({'url': url, 'w': width, 'h': height, 't': title});
+
+  /// Only https links from GIPHY's media servers are ever shown.
+  static GifPayload? tryParse(String? body) {
+    try {
+      final j = jsonDecode(body ?? '') as Map;
+      final url = j['url'];
+      if (url is! String) return null;
+      final uri = Uri.tryParse(url);
+      if (uri == null || uri.scheme != 'https' || !(uri.host == 'giphy.com' || uri.host.endsWith('.giphy.com'))) {
+        return null;
+      }
+      return GifPayload(
+        url: url,
+        width: (j['w'] as num?)?.toInt() ?? 0,
+        height: (j['h'] as num?)?.toInt() ?? 0,
+        title: j['t'] as String? ?? '',
+      );
+    } catch (_) {
+      return null;
+    }
+  }
 }

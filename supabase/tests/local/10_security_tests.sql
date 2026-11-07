@@ -242,16 +242,16 @@ select tests.ok((public.send_message(current_setting('test.conv')::uuid, repeat(
 select tests.throws($q$select public.send_message(current_setting('test.conv')::uuid, repeat('x', 5000), gen_random_uuid())$q$,
                     '%message_too_long%', 'plain text keeps the 2000-character limit');
 select tests.throws($q$select public.send_message(current_setting('test.conv')::uuid, 'k', gen_random_uuid(), 'image',
-                       'bbbbbbbb-0000-0000-0000-000000000002/x/y.bin', true)$q$,
-                    '%invalid_media%', 'photo must be in your own folder for this conversation');
-select tests.ok((public.send_message(current_setting('test.conv')::uuid, 'k', gen_random_uuid(), 'image',
-                 'aaaaaaaa-0000-0000-0000-000000000001/' || current_setting('test.conv') || '/p.bin', true)).kind = 'image',
-                'photo messages can be sent');
-select tests.ok((public.send_message(current_setting('test.conv')::uuid, 'k', gen_random_uuid(), 'video',
-                 'aaaaaaaa-0000-0000-0000-000000000001/' || current_setting('test.conv') || '/v.bin', true)).kind = 'video',
-                'video messages can be sent');
-select tests.throws($q$select public.send_message(current_setting('test.conv')::uuid, 'k', gen_random_uuid(), 'video', null, true)$q$,
-                    '%invalid_media%', 'a video needs its file');
+                       'aaaaaaaa-0000-0000-0000-000000000001/' || current_setting('test.conv') || '/p.bin', true)$q$,
+                    '%photos and videos can%', 'photos can no longer be sent in chat');
+select tests.throws($q$select public.send_message(current_setting('test.conv')::uuid, 'k', gen_random_uuid(), 'video',
+                       'aaaaaaaa-0000-0000-0000-000000000001/' || current_setting('test.conv') || '/v.bin', true)$q$,
+                    '%photos and videos can%', 'videos can no longer be sent in chat');
+select tests.ok((public.send_message(current_setting('test.conv')::uuid, 'sealed-gif-link', gen_random_uuid(), 'gif', null, true)
+                 ).kind = 'gif', 'GIFs can be sent, encrypted');
+select tests.throws($q$select public.send_message(current_setting('test.conv')::uuid, 'g', gen_random_uuid(), 'gif',
+                       'aaaaaaaa-0000-0000-0000-000000000001/' || current_setting('test.conv') || '/g.bin')$q$,
+                    '%invalid_media%', 'a GIF is a link, never an uploaded file');
 select tests.throws($q$select public.send_message(current_setting('test.conv')::uuid, 'k', gen_random_uuid(), 'audio', 'x', true)$q$,
                     '%unsupported_kind%', 'unknown media kinds are rejected');
 select tests.login(:B);
@@ -311,19 +311,19 @@ select tests.throws($q$select public.send_message(current_setting('test.conv')::
                     '%rate_limited%', 'message rate limit is enforced');
 
 -- -----------------------------------------------------------------------------
--- 5 MB media allowance per person
+-- 3 MB media allowance per person
 -- -----------------------------------------------------------------------------
 select tests.login(:A);
-select tests.ok((public.get_my_media_usage() ->> 'limit_bytes')::int = 5242880, 'the allowance is 5 MB');
+select tests.ok((public.get_my_media_usage() ->> 'limit_bytes')::int = 3145728, 'the allowance is 3 MB');
 insert into storage.objects (bucket_id, name, metadata)
-values ('profile-photos', 'aaaaaaaa-0000-0000-0000-000000000001/big.jpg', '{"size": 5300000}');
-select tests.ok((public.get_my_media_usage() ->> 'used_bytes')::bigint >= 5300000, 'usage adds up my files');
+values ('profile-photos', 'aaaaaaaa-0000-0000-0000-000000000001/big.jpg', '{"size": 3200000}');
+select tests.ok((public.get_my_media_usage() ->> 'used_bytes')::bigint >= 3200000, 'usage adds up my files');
 select tests.throws($q$insert into storage.objects (bucket_id, name, metadata)
                        values ('profile-photos', 'aaaaaaaa-0000-0000-0000-000000000001/more.jpg', '{"size": 1000}')$q$,
-                    '%row-level security%', 'uploads stop once 5 MB is used');
+                    '%row-level security%', 'uploads stop once 3 MB is used');
 select tests.throws($q$insert into storage.objects (bucket_id, name)
                        values ('chat-media', 'aaaaaaaa-0000-0000-0000-000000000001/' || current_setting('test.conv') || '/m.bin')$q$,
-                    '%row-level security%', 'chat photos count towards the same 5 MB');
+                    '%row-level security%', 'chat photos count towards the same 3 MB');
 reset role;
 delete from storage.objects where name = 'aaaaaaaa-0000-0000-0000-000000000001/big.jpg';
 set role authenticated;
@@ -523,40 +523,12 @@ select tests.throws($q$select public.request_verification('bbbbbbbb-0000-0000-00
 select tests.login(:C);
 select tests.ok((select count(*) from public.verification_requests) = 0, 'users cannot see others'' verification requests');
 
--- Map: approximate positions only
+-- Location stays private: only my own position, and no map of anyone else
 select tests.login(:G);
 update public.discovery_preferences set country_codes = '{}';
-select tests.ok(exists (select 1 from public.get_map_people() where id = :H), 'map shows people from the feed');
-select tests.ok((select abs(lat / 0.02 - round(lat / 0.02)) < 1e-6 from public.get_map_people() where id = :H),
-                'map positions are snapped to a ~2 km grid');
 select tests.ok((select count(*) from public.get_my_location()) = 1, 'I can read my own saved location');
--- Map view: one call with me, people and matches.
-select tests.ok(jsonb_array_length(public.get_map_view() -> 'people') >= 1, 'map view returns nearby people in one call');
-select tests.ok((public.get_map_view() -> 'me' ->> 'lat') is not null, 'map view includes my position');
-reset role;
-insert into public.matches (user_low, user_high) values (least(:G::uuid, :H::uuid), greatest(:G::uuid, :H::uuid)) on conflict do nothing;
-insert into public.conversations (match_id)
-select id from public.matches where user_low = least(:G::uuid, :H::uuid) and user_high = greatest(:G::uuid, :H::uuid)
-on conflict do nothing;
-set role authenticated;
-select tests.login(:G);
-select tests.ok((select (x ->> 'id') = :H from jsonb_array_elements(public.get_map_view() -> 'matches') x limit 1),
-                'my matches appear on the map');
-select tests.ok((select abs((x ->> 'lat')::float8 / 0.02 - round((x ->> 'lat')::float8 / 0.02)) < 1e-6
-                   from jsonb_array_elements(public.get_map_view() -> 'matches') x limit 1),
-                'match positions are snapped to the same ~2 km grid');
-select tests.ok((select (x ? 'conversation_id') from jsonb_array_elements(public.get_map_view() -> 'matches') x limit 1),
-                'map matches carry the conversation to open the chat');
-select tests.login(:H);
-update public.privacy_settings set show_distance = false;
-select tests.login(:G);
-select tests.ok(jsonb_array_length(public.get_map_view() -> 'matches') = 0, 'a match who hides their distance is not on the map');
-select tests.login(:H);
-update public.privacy_settings set show_distance = true;
-reset role;
-delete from public.matches where user_low = least(:G::uuid, :H::uuid) and user_high = greatest(:G::uuid, :H::uuid);
-set role authenticated;
-select tests.login(:G);
+select tests.ok(not exists (select 1 from pg_proc where proname in ('get_map_people', 'get_map_view')),
+                'there is no map of other people''s positions');
 
 -- ID document age review
 select tests.login(:F);
@@ -665,7 +637,9 @@ reset role;
 -- -----------------------------------------------------------------------------
 set role authenticated;
 select tests.login(:A);
-select tests.ok((public.get_like_allowance() ->> 'limit')::int = 100, 'base daily like limit is 100');
+select tests.ok((public.get_like_allowance() ->> 'limit')::int = 25, 'base daily like limit is 25');
+select tests.ok((public.get_like_allowance() ->> 'swipe_limit')::int = 100, 'base daily swipe limit is 100');
+select tests.throws('select count(*) from public.swipe_log', '%permission denied%', 'the swipe log is not readable');
 select tests.throws($q$select public.grant_ad_reward('tx-fake', 'aaaaaaaa-0000-0000-0000-000000000001', 50, 'x')$q$,
                     '%permission denied%', 'users cannot grant themselves ad rewards');
 select tests.throws($q$insert into public.ad_rewards (transaction_id, user_id, reward_likes) values ('t', 'aaaaaaaa-0000-0000-0000-000000000001', 50)$q$,
@@ -673,14 +647,21 @@ select tests.throws($q$insert into public.ad_rewards (transaction_id, user_id, r
 set role service_role;
 select tests.ok(public.grant_ad_reward('tx-1', :A, 10, 'unit') = 'granted', 'verified reward is granted');
 select tests.ok(public.grant_ad_reward('tx-1', :A, 10, 'unit') = 'duplicate', 'same Google transaction is never granted twice');
-select public.grant_ad_reward('tx-2', :A, 10, 'unit');
-select public.grant_ad_reward('tx-3', :A, 10, 'unit');
-select tests.ok(public.grant_ad_reward('tx-4', :A, 10, 'unit') = 'daily_cap', 'rewarded ads are capped per day');
+select public.grant_ad_reward('tx-' || n, :A, 10, 'unit') from generate_series(2, 10) n;
+select tests.ok(public.grant_ad_reward('tx-11', :A, 10, 'unit') = 'daily_cap', 'rewarded ads are capped at 10 a day');
 set role authenticated;
 select tests.login(:A);
-select tests.ok((public.get_like_allowance() ->> 'limit')::int = 130, 'rewards raise the daily like limit');
+select tests.ok((public.get_like_allowance() ->> 'limit')::int = 125, 'rewards raise the daily like limit');
+select tests.ok((public.get_like_allowance() ->> 'swipe_limit')::int = 300, 'each reward adds 20 swipes');
 select tests.ok((public.get_like_allowance() ->> 'rewarded_ads_left')::int = 0, 'allowance reports no ads left');
 reset role;
+insert into public.swipe_log (swiper_id) select :A::uuid from generate_series(1, 300);
+set role authenticated;
+select tests.login(:A);
+select tests.throws($q$select public.swipe('dddddddd-0000-0000-0000-000000000004', 'pass')$q$,
+                    '%out of swipes%', 'passes stop when the daily swipes are used up');
+reset role;
+delete from public.swipe_log where swiper_id = :A;
 
 -- -----------------------------------------------------------------------------
 -- Zodiac: shared as a sign only, and can be hidden
@@ -826,6 +807,38 @@ reset role;
 select tests.ok(exists (select 1 from private.claim_expired_proofs() where bucket = 'moments'),
                 'the scheduled cleanup also removes moment photos without a live moment');
 set role authenticated;
+
+-- No ID document needed: photos, bio and interests are enough
+reset role;
+insert into public.profile_photos (user_id, storage_path, position)
+values (:M, '11111111-0000-4000-8000-000000000001/a.jpg', 0), (:M, '11111111-0000-4000-8000-000000000001/b.jpg', 1);
+update public.profiles set bio = 'Hello', age_verified = false where id = :M;
+select tests.ok(not exists (select 1 from public.age_verifications where user_id = :M)
+                and private.profile_ready(:M), 'a profile with photos, bio and interests is ready without an ID');
+set role authenticated;
+
+-- -----------------------------------------------------------------------------
+-- Green and red flags: only after chatting, and only you see your counts
+-- -----------------------------------------------------------------------------
+set role authenticated;
+select tests.login(:A);
+select tests.ok(public.set_profile_flag(:B, 'green') = 'green', 'someone I chatted with can get a green flag');
+select tests.ok(public.get_my_flag_for(:B) = 'green', 'I can see the flag I gave');
+select tests.ok(public.set_profile_flag(:B, 'red') = 'red', 'a flag can be changed');
+select tests.throws('select * from public.profile_flags', '%permission denied%', 'nobody can read the flag table');
+select tests.login(:C);
+select tests.throws($q$select public.set_profile_flag('aaaaaaaa-0000-0000-0000-000000000001', 'red')$q$,
+                    '%not_allowed%', 'strangers cannot flag anyone');
+select tests.login(:B);
+select tests.ok((public.get_my_profile_feedback() ->> 'red_flags')::int = 1, 'I see the red flags I received');
+select tests.ok((public.get_my_profile_feedback() ->> 'likes')::int >= 1, 'I see how many likes I received');
+select tests.throws('select * from public.admin_list_red_flagged()', '%forbidden%', 'only admins see the red-flag list');
+select tests.login(:A);
+select public.set_profile_flag(:B, null);
+select tests.ok(public.get_my_flag_for(:B) is null, 'a flag can be taken back');
+select tests.login(:Z);
+select tests.ok((select count(*) from public.admin_list_red_flagged()) >= 0, 'admins can open the red-flag list');
+reset role;
 
 -- -----------------------------------------------------------------------------
 -- No views that run with their owner's rights (Supabase "Security Definer View" lint)

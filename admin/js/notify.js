@@ -10,7 +10,6 @@ export async function refreshBadges() {
     const s = await rpc('admin_stats');
     $('#badge-reports').textContent = s.reports_open || '';
     $('#badge-verifications').textContent = s.verifications_pending || '';
-    $('#badge-age-checks').textContent = s.age_checks_pending || '';
     $('#badge-errors').textContent = s.errors_unresolved || '';
   } catch { /* ignore */ }
 }

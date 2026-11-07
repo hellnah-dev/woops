@@ -8,6 +8,7 @@ import '../../../core/utils/time_format.dart';
 import '../../../core/widgets/profile_photo.dart';
 import '../../../core/widgets/state_views.dart';
 import '../../ads/ad_widgets.dart';
+import '../../ads/daily_unlock.dart';
 import '../../chat/application/chat_controllers.dart';
 import '../../chat/domain/chat_models.dart';
 import '../../chat/presentation/conversation_actions.dart';
@@ -86,41 +87,48 @@ class MatchesScreen extends ConsumerWidget {
               .toList();
           final talking = shown.where((c) => c.hasMessages && !waiting.contains(c)).toList();
 
-          return RefreshIndicator(
-            onRefresh: refresh,
-            child: CustomScrollView(
-              physics: const AlwaysScrollableScrollPhysics(),
-              slivers: [
-                if (counts.isNotEmpty)
-                  SliverToBoxAdapter(
-                    child: _ModeFilter(counts: counts, total: all.length, selected: filter),
-                  ),
-                if (shown.isEmpty)
-                  SliverToBoxAdapter(
-                    child: Padding(
-                      padding: const EdgeInsets.all(AppSpacing.lg),
-                      child: Text(
-                        'No ${filter?.label.toLowerCase()} matches yet.',
-                        textAlign: TextAlign.center,
-                        style: Theme.of(context).textTheme.bodyMedium,
+          // One short ad a day opens Matches (from day 3 of use).
+          return DailyAdGate(
+            feature: 'matches',
+            icon: Icons.people_alt_rounded,
+            title: 'You have ${all.length} ${all.length == 1 ? 'match' : 'matches'}',
+            message: 'Watch one short ad to open your matches for today.',
+            child: RefreshIndicator(
+              onRefresh: refresh,
+              child: CustomScrollView(
+                physics: const AlwaysScrollableScrollPhysics(),
+                slivers: [
+                  if (counts.isNotEmpty)
+                    SliverToBoxAdapter(
+                      child: _ModeFilter(counts: counts, total: all.length, selected: filter),
+                    ),
+                  if (shown.isEmpty)
+                    SliverToBoxAdapter(
+                      child: Padding(
+                        padding: const EdgeInsets.all(AppSpacing.lg),
+                        child: Text(
+                          'No ${filter?.label.toLowerCase()} matches yet.',
+                          textAlign: TextAlign.center,
+                          style: Theme.of(context).textTheme.bodyMedium,
+                        ),
                       ),
                     ),
-                  ),
-                if (fresh.isNotEmpty) ...[
-                  _header(context, 'New matches', 'Say hi. They’re waiting!'),
-                  _grid(fresh, insights, badge: _Badge.isNew),
+                  if (fresh.isNotEmpty) ...[
+                    _header(context, 'New matches', 'Say hi. They’re waiting!'),
+                    ..._grid(fresh, insights, badge: _Badge.isNew),
+                  ],
+                  if (waiting.isNotEmpty) ...[
+                    _header(context, 'Waiting on you', 'They wrote last. Your turn 💬'),
+                    ..._grid(waiting, insights, badge: _Badge.waiting),
+                  ],
+                  if (talking.isNotEmpty) ...[
+                    _header(context, 'In conversation', null),
+                    ..._grid(talking, insights, badge: _Badge.none),
+                  ],
+                  // Room below the last row for the glass tab bar.
+                  SliverToBoxAdapter(child: SizedBox(height: AppSpacing.lg + MediaQuery.paddingOf(context).bottom)),
                 ],
-                if (waiting.isNotEmpty) ...[
-                  _header(context, 'Waiting on you', 'They wrote last. Your turn 💬'),
-                  _grid(waiting, insights, badge: _Badge.waiting),
-                ],
-                if (talking.isNotEmpty) ...[
-                  _header(context, 'In conversation', null),
-                  _grid(talking, insights, badge: _Badge.none),
-                ],
-                // Room below the last row for the glass tab bar.
-                SliverToBoxAdapter(child: SizedBox(height: AppSpacing.lg + MediaQuery.paddingOf(context).bottom)),
-              ],
+              ),
             ),
           );
         },
@@ -145,20 +153,19 @@ class MatchesScreen extends ConsumerWidget {
     );
   }
 
-  Widget _grid(List<ConversationSummary> items, Map<String, MatchInsight> insights, {required _Badge badge}) =>
-      SliverPadding(
+  /// A grid of match cards, with a paced ad card after every 8.
+  List<Widget> _grid(List<ConversationSummary> items, Map<String, MatchInsight> insights, {required _Badge badge}) =>
+      adSpacedGrid(
+        itemCount: items.length,
         padding: const EdgeInsets.symmetric(horizontal: AppSpacing.md),
-        sliver: SliverGrid.builder(
-          itemCount: items.length,
-          gridDelegate: const SliverGridDelegateWithMaxCrossAxisExtent(
-            maxCrossAxisExtent: 180,
-            mainAxisSpacing: 12,
-            crossAxisSpacing: 12,
-            childAspectRatio: 0.72,
-          ),
-          itemBuilder: (context, i) =>
-              _MatchTile(summary: items[i], insight: insights[items[i].otherUserId], badge: badge),
+        gridDelegate: const SliverGridDelegateWithMaxCrossAxisExtent(
+          maxCrossAxisExtent: 180,
+          mainAxisSpacing: 12,
+          crossAxisSpacing: 12,
+          childAspectRatio: 0.72,
         ),
+        itemBuilder: (context, i) =>
+            _MatchTile(summary: items[i], insight: insights[items[i].otherUserId], badge: badge),
       );
 }
 

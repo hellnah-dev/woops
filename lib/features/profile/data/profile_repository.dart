@@ -81,7 +81,7 @@ class ProfileRepository {
   Future<void> uploadPhoto(XFile file, {required int position}) async {
     final uid = _uid;
     final processed = await _images.processProfilePhoto(await file.readAsBytes());
-    // 5 MB of media per person in total (profile photos + chat photos on the server).
+    // 3 MB of media per person in total (profile and moment photos on the server).
     final usage = await mediaUsage();
     final adding = processed.full.lengthInBytes + (processed.thumbnail?.lengthInBytes ?? 0);
     if (usage.used + adding > usage.limit) {
@@ -112,7 +112,7 @@ class ProfileRepository {
     }
   }
 
-  /// Bytes of my media on the server and the 5 MB allowance.
+  /// Bytes of my media on the server and the 3 MB allowance.
   Future<({int used, int limit})> mediaUsage() async {
     try {
       final j = Map<String, dynamic>.from(await _client.rpc('get_my_media_usage') as Map);
@@ -133,19 +133,6 @@ class ProfileRepository {
         .from('verification-selfies')
         .uploadBinary(path, bytes, fileOptions: const FileOptions(contentType: 'image/jpeg', upsert: false));
     await _client.rpc('request_verification', params: {'p_selfie_path': path});
-  }
-
-  /// Uploads a photo of an ID document (only admins can view it, and it is
-  /// deleted after review) and asks for an age check.
-  Future<void> submitAgeDocument(XFile document, {required String documentType}) async {
-    final uid = _uid;
-    final original = await document.readAsBytes();
-    ImageProcessor.checkUploadSize(original.lengthInBytes);
-    final bytes = await _images.processDocument(original);
-    final path = '$uid/${DateTime.now().microsecondsSinceEpoch}.jpg';
-    final bucket = _client.storage.from('id-documents');
-    await bucket.uploadBinary(path, bytes, fileOptions: const FileOptions(contentType: 'image/jpeg', upsert: false));
-    await _client.rpc('submit_age_verification', params: {'p_document_type': documentType, 'p_document_path': path});
   }
 
   Future<int> minAgeForCountry(String? countryCode) async {

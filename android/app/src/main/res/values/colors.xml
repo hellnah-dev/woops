@@ -1,4 +1,6 @@
 <?xml version="1.0" encoding="utf-8"?>
 <resources>
     <color name="ic_launcher_background">#FFE3EE</color>
+    <!-- Accent of push notifications: the purple of the Woops ant. -->
+    <color name="notification_color">#936BFF</color>
 </resources>

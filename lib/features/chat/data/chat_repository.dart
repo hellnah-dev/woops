@@ -34,7 +34,7 @@ abstract class ChatRepository {
   Future<Uint8List> downloadMedia(String path);
   Future<void> deleteMedia(String path);
 
-  /// Bytes of my media on the server and the 5 MB allowance.
+  /// Bytes of my media on the server and the 3 MB allowance.
   Future<({int used, int limit})> mediaUsage();
   Future<void> markRead(String conversationId);
   Future<DateTime?> fetchReadReceipt(String conversationId, String userId);

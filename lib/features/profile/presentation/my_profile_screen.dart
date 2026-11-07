@@ -3,6 +3,7 @@ import 'package:flutter_riverpod/flutter_riverpod.dart';
 import 'package:go_router/go_router.dart';
 
 import '../../../core/router/app_router.dart';
+import '../../../core/supabase/supabase_providers.dart';
 import '../../../core/theme/app_colors.dart';
 import '../../../core/utils/validators.dart';
 import '../../../core/widgets/love_ui.dart';
@@ -54,36 +55,17 @@ class MyProfileScreen extends ConsumerWidget {
                 _Header(profile: p),
                 const SizedBox(height: AppSpacing.md),
                 if (!p.isReadyToDate) ...[ReadinessCard(profile: p), const SizedBox(height: AppSpacing.md)],
-                Row(
-                  children: [
-                    Expanded(
-                      child: _QuickTile(
-                        icon: p.isVerified ? Icons.verified_rounded : Icons.verified_outlined,
-                        color: Colors.blue,
-                        title: p.isVerified ? 'Verified' : 'Get verified',
-                        subtitle: p.isVerified ? 'Blue badge on' : 'Quick selfie',
-                        onTap: p.isVerified ? null : () => context.push(Routes.verify),
-                      ),
-                    ),
-                    const SizedBox(width: 12),
-                    Expanded(
-                      child: _QuickTile(
-                        icon: Icons.badge_outlined,
-                        color: AppColors.apricot,
-                        title: 'Age check',
-                        subtitle: switch (p.ageCheck) {
-                          AgeCheck.approved => 'Confirmed',
-                          AgeCheck.pending => 'In review',
-                          AgeCheck.rejected => 'Try again',
-                          AgeCheck.none => 'Add your ID',
-                        },
-                        onTap: p.ageCheck == AgeCheck.approved ? null : () => context.push(Routes.ageCheck),
-                      ),
-                    ),
-                  ],
+                _QuickTile(
+                  icon: p.isVerified ? Icons.verified_rounded : Icons.verified_outlined,
+                  color: Colors.blue,
+                  title: p.isVerified ? 'Verified' : 'Get verified',
+                  subtitle: p.isVerified ? 'Blue badge on' : 'A quick selfie adds a blue badge',
+                  onTap: p.isVerified ? null : () => context.push(Routes.verify),
                 ),
                 const SizedBox(height: 12),
                 const _StatsRow(),
+                const SizedBox(height: 12),
+                const _FeedbackCard(),
                 const SizedBox(height: 12),
                 if (p.completeness < 1) ...[CompletionCard(profile: p), const SizedBox(height: 12)],
                 _PhotosCard(profile: p),
@@ -94,8 +76,6 @@ class MyProfileScreen extends ConsumerWidget {
                   padding: EdgeInsets.zero,
                   child: Column(
                     children: [
-                      _Row(icon: Icons.map_outlined, label: 'People near you', onTap: () => context.push(Routes.map)),
-                      const Divider(indent: 56),
                       _Row(
                         icon: Icons.tune_rounded,
                         label: 'Settings & privacy',
@@ -316,7 +296,7 @@ class CompletionCard extends StatelessWidget {
           for (final item in todo)
             InkWell(
               borderRadius: BorderRadius.circular(AppRadius.sm),
-              onTap: () => context.push(item.label.startsWith('Confirm') ? Routes.ageCheck : Routes.editProfile),
+              onTap: () => context.push(item.label.startsWith('Verify') ? Routes.verify : Routes.editProfile),
               child: Padding(
                 padding: const EdgeInsets.symmetric(vertical: 7),
                 child: Row(
@@ -371,6 +351,62 @@ class _StatsRow extends ConsumerWidget {
             label: 'Chats',
             icon: Icons.chat_bubble_rounded,
             onTap: () => context.go(Routes.chats),
+          ),
+        ],
+      ),
+    );
+  }
+}
+
+/// My green/red flags and all likes ever received. Private: only I see them.
+final myFeedbackProvider = FutureProvider.autoDispose<Map<String, int>>((ref) async {
+  ref.watch(currentUserIdProvider);
+  final j = Map<String, dynamic>.from(await ref.read(supabaseClientProvider).rpc('get_my_profile_feedback') as Map);
+  return {for (final e in j.entries) e.key: (e.value as num).toInt()};
+});
+
+class _FeedbackCard extends ConsumerWidget {
+  const _FeedbackCard();
+
+  @override
+  Widget build(BuildContext context, WidgetRef ref) {
+    final f = ref.watch(myFeedbackProvider).valueOrNull;
+    if (f == null) return const SizedBox.shrink();
+    final theme = Theme.of(context);
+    Widget item(String emoji, int value, String label) => Expanded(
+      child: Column(
+        children: [
+          Text('$emoji $value', style: theme.textTheme.titleLarge?.copyWith(fontWeight: FontWeight.w800)),
+          Text(label, style: theme.textTheme.bodySmall?.copyWith(color: theme.colorScheme.onSurfaceVariant)),
+        ],
+      ),
+    );
+    return SoftCard(
+      padding: const EdgeInsets.fromLTRB(12, 12, 12, 14),
+      child: Column(
+        crossAxisAlignment: CrossAxisAlignment.start,
+        children: [
+          Row(
+            children: [
+              Text('How people see you', style: theme.textTheme.titleSmall?.copyWith(fontWeight: FontWeight.w800)),
+              const Spacer(),
+              Icon(Icons.lock_outline_rounded, size: 14, color: theme.colorScheme.onSurfaceVariant),
+              const SizedBox(width: 4),
+              Text('Only you can see this', style: theme.textTheme.labelSmall),
+            ],
+          ),
+          const SizedBox(height: 10),
+          Row(
+            children: [
+              item('💚', f['green_flags'] ?? 0, 'Green flags'),
+              item('🚩', f['red_flags'] ?? 0, 'Red flags'),
+              item('❤️', f['likes'] ?? 0, 'Likes received'),
+            ],
+          ),
+          const SizedBox(height: 8),
+          Text(
+            'People you’ve chatted with can give you a flag. Kind, honest chats earn green ones.',
+            style: theme.textTheme.bodySmall?.copyWith(color: theme.colorScheme.onSurfaceVariant),
           ),
         ],
       ),

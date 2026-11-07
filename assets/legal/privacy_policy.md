@@ -12,11 +12,11 @@ This Privacy Policy explains how HellNah ("we", "us") collects, uses and protect
 - Profile information: first name, gender, who you want to meet, what you are looking for, bio, prompts, interests, job title and city.
 - Photos you upload (up to 5 MB of media in total per person). Before upload, photos are resized and their hidden metadata (EXIF, including GPS location) is removed on your device.
 - Messages and photos you send to your matches. They are end-to-end encrypted on your phone, so we cannot read them. Chat history is stored only on your phone and your match's phone. Our servers hold a message only until it is delivered to the other phone (at most 30 days if it is never delivered), then delete it.
-- Reports you make about other users (if you report a message, a copy of that message is sent with your report), and verification selfies if you choose to get verified. Selfies are only visible to our moderation team.
-- A photo of an identity document, used once to confirm you meet your country's minimum age. Only our moderation team can see it, and it is deleted as soon as it has been reviewed, and in any case within 7 days. Verification selfies are handled the same way. We keep only the result (approved or not) and the document type.
+- Reports you make about other users (if you report a message, a copy of that message is sent with your report).
+- A verification selfie, only if you choose to get the verified badge. Only our moderation team can see it, and it is deleted as soon as it has been reviewed, and in any case within 7 days. We keep only the result (approved or not). We never ask for an identity document.
 
 **Collected automatically:**
-- Approximate location, only if you allow it. We round it to about 1 km before storing it and never show your exact location. Others see an approximate distance and, on the map, an approximate area (about 2 km); turning off "Show distance" hides both.
+- Approximate location, only if you allow it. We round it to about 1 km before storing it and never show your exact location. Others see only roughly how far away you are (for example "Less than 2 km away" or "12 km away"), never where you are; turning off "Show distance" hides it.
 - Activity in the App: likes, passes, matches, blocks and the last time you were active.
 - A push-notification token for your device, if you allow notifications.
 - Error reports (for example, crash messages, app version and device platform) to help us fix problems.

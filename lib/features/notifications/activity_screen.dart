@@ -47,8 +47,10 @@ class _ActivityScreenState extends ConsumerState<ActivityScreen> {
 
   @override
   void dispose() {
-    // Opening the list counts as seeing everything in it.
-    _center.markAllRead();
+    // Opening the list counts as seeing everything in it. Providers can't
+    // change while the tree is being torn down, so do it right after.
+    final center = _center;
+    Future.microtask(center.markAllRead);
     super.dispose();
   }
 

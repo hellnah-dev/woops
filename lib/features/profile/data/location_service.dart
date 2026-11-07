@@ -33,12 +33,13 @@ class LocationService {
     return position;
   }
 
-  /// Medium accuracy (~100 m, Wi-Fi/GPS) so the map is right; the server still
-  /// rounds what it stores to ~1 km. Falls back to the last known fix.
+  /// Low accuracy (about 1 km, from Wi-Fi and cell towers): enough for "km
+  /// away", easier on the battery, and the server rounds what it stores to
+  /// ~1 km anyway. Falls back to the last known fix.
   Future<Position> _freshPosition() async {
     try {
       return await Geolocator.getCurrentPosition(
-        locationSettings: const LocationSettings(accuracy: LocationAccuracy.medium, timeLimit: Duration(seconds: 12)),
+        locationSettings: const LocationSettings(accuracy: LocationAccuracy.low, timeLimit: Duration(seconds: 12)),
       );
     } catch (_) {
       final last = await Geolocator.getLastKnownPosition();

@@ -8,9 +8,13 @@ import 'ads_config.dart';
 /// Decides how often passive ads (native cards, the Discover ad card) may
 /// appear, so ads start minimal and grow slowly:
 ///
-///  * a rolling 5-minute limit that rises with how long someone has used the
-///    app: day 1 → 1 ad per 5 min, then +1 per step until the maximum
-///    (default 5 per 5 min) on day [AdsConfig.rampDays];
+///  * a rolling 5-minute limit that rises with how many days someone has
+///    actually used the app (not calendar days, so people who drop in rarely
+///    ramp up slowly): day 1 → 1 ad per 5 min, then +1 per step until the
+///    maximum (default 5 per 5 min) on day [AdsConfig.rampDays]. Longer
+///    sessions see more ads simply because they span more 5-minute windows;
+///  * the stronger formats (daily unlock, banners) only from day
+///    [AdsConfig.strongAdsFromDay] of use;
 ///  * no passive ads in the first [AdsConfig.sessionGraceSeconds] of each
 ///    session (opening the app is never met with an ad);
 ///  * rewarded ads are chosen by the user and never counted or limited here.
@@ -22,6 +26,7 @@ class AdPacing {
     required DateTime sessionStart,
     List<DateTime> impressions = const [],
     DateTime Function()? clock,
+    this.activeDays,
     this.maxPer5Min = AdsConfig.maxPer5Min,
     this.rampDays = AdsConfig.rampDays,
     this.graceSeconds = AdsConfig.sessionGraceSeconds,
@@ -36,6 +41,16 @@ class AdPacing {
   final DateTime Function() _clock;
   final int maxPer5Min;
   final int rampDays;
+
+  /// Days on which the app was opened, today included (null: not known yet,
+  /// then calendar days since [firstSeen] are used).
+  final int? activeDays;
+
+  /// Which day of use this is (1 on the first day).
+  int get daysUsed => activeDays ?? _clock().difference(_firstSeen).inDays + 1;
+
+  /// Daily unlock and banners: not for brand-new users.
+  bool get strongAdsAllowed => daysUsed >= AdsConfig.strongAdsFromDay;
   final int graceSeconds;
 
   static const window = Duration(minutes: 5);
@@ -46,7 +61,7 @@ class AdPacing {
   /// evenly to [maxPer5Min] by day [rampDays].
   int get capPer5Min {
     if (maxPer5Min <= 1 || rampDays <= 1) return maxPer5Min.clamp(0, 1 << 10);
-    final days = _clock().difference(_firstSeen).inDays;
+    final days = daysUsed - 1;
     final step = rampDays / (maxPer5Min - 1);
     return (1 + (days / step).floor()).clamp(1, maxPer5Min);
   }
@@ -75,6 +90,8 @@ class AdPacing {
 class AdPacerController extends Notifier<AdPacing> {
   static const _firstSeenKey = 'ads_first_seen';
   static const _impressionsKey = 'ads_recent_impressions';
+  static const _activeDaysKey = 'ads_active_days';
+  static const _lastActiveDayKey = 'ads_last_active_day';
 
   @override
   AdPacing build() {
@@ -92,6 +109,14 @@ class AdPacerController extends Notifier<AdPacing> {
         firstMs = sessionStart.millisecondsSinceEpoch;
         await prefs.setInt(_firstSeenKey, firstMs);
       }
+      // Count each day the app is opened once.
+      final today = '${sessionStart.year}-${sessionStart.month}-${sessionStart.day}';
+      var activeDays = prefs.getInt(_activeDaysKey) ?? 0;
+      if (prefs.getString(_lastActiveDayKey) != today) {
+        activeDays++;
+        await prefs.setInt(_activeDaysKey, activeDays);
+        await prefs.setString(_lastActiveDayKey, today);
+      }
       final recent = (jsonDecode(prefs.getString(_impressionsKey) ?? '[]') as List)
           .map((e) => DateTime.fromMillisecondsSinceEpoch(e as int))
           .toList();
@@ -99,6 +124,7 @@ class AdPacerController extends Notifier<AdPacing> {
         firstSeen: DateTime.fromMillisecondsSinceEpoch(firstMs),
         sessionStart: sessionStart,
         impressions: [...recent, ...state.impressions],
+        activeDays: activeDays,
       );
     } catch (_) {
       // Storage unavailable: keep the conservative defaults.

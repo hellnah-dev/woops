@@ -22,12 +22,6 @@ class AboutScreen extends ConsumerWidget {
     final info = ref.watch(packageInfoProvider).valueOrNull;
     final version = info == null ? '' : 'Version ${info.version} (build ${info.buildNumber})';
 
-    Widget fact(IconData icon, String title, String text) => ListTile(
-      leading: Icon(icon, color: theme.colorScheme.primary),
-      title: Text(title),
-      subtitle: Text(text),
-    );
-
     return Scaffold(
       appBar: AppBar(title: const Text('About')),
       body: ListView(
@@ -49,23 +43,7 @@ class AboutScreen extends ConsumerWidget {
               ),
             ),
           ),
-          Padding(
-            padding: const EdgeInsets.all(AppSpacing.lg),
-            child: Text(
-              'Woops helps adults find genuine connections, anywhere in the world. '
-              'Made with 💕 and a strong focus on safety and privacy.',
-              style: theme.textTheme.bodyLarge,
-              textAlign: TextAlign.center,
-            ),
-          ),
-          fact(
-            Icons.lock_outline_rounded,
-            'Your privacy',
-            'Exact location never stored; photos stripped of hidden data.',
-          ),
-          fact(Icons.verified_user_outlined, 'Adults only', '18+, or older where local law requires.'),
-          fact(Icons.shield_outlined, 'Safety first', 'Block and report anyone; reports are confidential.'),
-          const Divider(height: 32),
+          const SizedBox(height: AppSpacing.sm),
           for (final doc in LegalDoc.values)
             ListTile(
               leading: const Icon(Icons.description_outlined),

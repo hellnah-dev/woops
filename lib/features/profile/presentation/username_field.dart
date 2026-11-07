@@ -31,7 +31,13 @@ class _UsernameFieldState extends ConsumerState<UsernameField> {
   @override
   void initState() {
     super.initState();
-    if ((widget.initial ?? '').isNotEmpty) _check(widget.initial!);
+    // After the first frame: the check reports to the parent, which can't
+    // rebuild while this field is still being built.
+    if ((widget.initial ?? '').isNotEmpty) {
+      WidgetsBinding.instance.addPostFrameCallback((_) {
+        if (mounted) _check(widget.initial!);
+      });
+    }
   }
 
   @override

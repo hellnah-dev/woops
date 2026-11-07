@@ -170,6 +170,8 @@ void main() {
     await c.send('hi');
     expect(repo.typing.sent, [true, false]);
     container.dispose();
+    // The channel closes once the last "stopped typing" has gone out.
+    await pumpEventQueue();
     expect(repo.typing.closed, isTrue);
   });
 
@@ -383,6 +385,7 @@ void main() {
         body: '📷 Photo',
         createdAt: DateTime.now().toUtc(),
         localPath: local,
+        viewOnce: true,
       );
       await store.upsert('c1', [m]);
       await pumpEventQueue();
@@ -391,6 +394,27 @@ void main() {
       final saved = (await store.read('c1')).messages.single;
       expect(saved.viewed, isTrue);
       expect(saved.localPath, isNull);
+    });
+
+    test('photos from before view-once stay on the phone after viewing', () async {
+      final c = await startWithKeys();
+      final local = await store.saveMedia('c1', 'old.img', Uint8List.fromList([4, 5, 6]));
+      await store.upsert('c1', [
+        ChatMessage(
+          id: 'm8',
+          conversationId: 'c1',
+          senderId: 'other',
+          clientId: 'm8',
+          kind: MessageKind.image,
+          body: '📷 Photo',
+          createdAt: DateTime.now().toUtc(),
+          localPath: local,
+        ),
+      ]);
+      await pumpEventQueue();
+      await c.markViewed(state().messages.single);
+      expect(store.media, isNotEmpty);
+      expect((await store.read('c1')).messages.single.localPath, local);
     });
 
     test('several photos and a video are compressed and sent in order', () async {

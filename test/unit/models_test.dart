@@ -50,8 +50,8 @@ void main() {
     });
     expect(p.primaryPhoto, 'me/a.jpg');
     expect(p.interestIds, {1});
-    expect(p.completeness, closeTo(0.175, 0.001)); // 2 of 4 photos
-    expect(p.missingSteps, [ProfileStep.bio, ProfileStep.interests, ProfileStep.ageCheck]);
+    expect(p.completeness, closeTo(0.2, 0.001)); // 2 of 4 photos
+    expect(p.missingSteps, [ProfileStep.bio, ProfileStep.interests]);
     expect(p.isReadyToDate, isFalse);
   });
 
@@ -74,7 +74,7 @@ void main() {
     );
   });
 
-  test('a pending ID review counts as ready; a rejected one does not', () {
+  test('no ID document is needed: photos, bio and interests are enough', () {
     Map<String, dynamic> json(String status) => {
       'id': 'me',
       'display_name': 'Me',
@@ -96,11 +96,10 @@ void main() {
         {'status': status, 'reject_reason': null, 'created_at': '2026-10-02T00:00:00Z'},
       ],
     };
-    expect(MyProfile.fromJson(json('pending')).isReadyToDate, isTrue);
-    final rejected = MyProfile.fromJson(json('rejected'));
-    expect(rejected.ageCheck, AgeCheck.rejected);
-    expect(rejected.missingSteps, [ProfileStep.ageCheck]);
-    expect(MyProfile.fromJson({...json('pending'), 'age_verified': true}).ageCheck, AgeCheck.approved);
+    // Even an old rejected ID review no longer blocks anyone.
+    expect(MyProfile.fromJson(json('rejected')).isReadyToDate, isTrue);
+    expect(MyProfile.fromJson(json('rejected')).missingSteps, isEmpty);
+    expect(MyProfile.fromJson({...json('pending'), 'age_verifications': []}).isReadyToDate, isTrue);
   });
 
   test('ProfileCard reads the random-pick flag (defaults to false)', () {

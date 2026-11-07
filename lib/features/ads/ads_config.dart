@@ -11,10 +11,14 @@ class AdsConfig {
 
   static const enabled = bool.fromEnvironment('ADS_ENABLED', defaultValue: true);
 
-  /// Placement switches ("frequency" controls). Interstitials are never used.
+  /// Placement switches ("frequency" controls). Full-screen ads are used only
+  /// for the once-a-day unlock of Likes and Matches, when the user taps it.
   static const bannersEnabled = bool.fromEnvironment('ADS_BANNERS', defaultValue: true);
   static const nativeEnabled = bool.fromEnvironment('ADS_NATIVE', defaultValue: true);
   static const rewardedEnabled = bool.fromEnvironment('ADS_REWARDED', defaultValue: true);
+
+  /// One full-screen ad a day opens Likes, and one opens Matches.
+  static const dailyUnlockEnabled = bool.fromEnvironment('ADS_DAILY_UNLOCK', defaultValue: true);
 
   /// "Sponsored" card shown between profiles in Discover (paced, see AdPacing).
   static const deckEnabled = bool.fromEnvironment('ADS_DECK', defaultValue: true);
@@ -24,6 +28,10 @@ class AdsConfig {
   static const maxPer5Min = int.fromEnvironment('ADS_MAX_PER_5MIN', defaultValue: 5);
   static const rampDays = int.fromEnvironment('ADS_RAMP_DAYS', defaultValue: 7);
   static const sessionGraceSeconds = int.fromEnvironment('ADS_GRACE_SECONDS', defaultValue: 60);
+
+  /// Day of use from which the daily unlock (Likes, Matches) and banners
+  /// appear. New users get a lighter first impression.
+  static const strongAdsFromDay = int.fromEnvironment('ADS_STRONG_FROM_DAY', defaultValue: 3);
 
   /// Extra likes per rewarded ad, for display only; the server decides the real
   /// amount (REWARD_LIKES secret) and the daily cap.
@@ -44,6 +52,8 @@ class AdsConfig {
   static const _testNativeIos = 'ca-app-pub-3940256099942544/3986624511';
   static const _testRewardedAndroid = 'ca-app-pub-3940256099942544/5224354917';
   static const _testRewardedIos = 'ca-app-pub-3940256099942544/1712485313';
+  static const _testInterstitialAndroid = 'ca-app-pub-3940256099942544/1033173712';
+  static const _testInterstitialIos = 'ca-app-pub-3940256099942544/4411468910';
 
   static const _bannerAndroid = String.fromEnvironment('ADMOB_ANDROID_BANNER_ID');
   static const _bannerIos = String.fromEnvironment('ADMOB_IOS_BANNER_ID');
@@ -51,6 +61,8 @@ class AdsConfig {
   static const _nativeIos = String.fromEnvironment('ADMOB_IOS_NATIVE_ID');
   static const _rewardedAndroid = String.fromEnvironment('ADMOB_ANDROID_REWARDED_ID');
   static const _rewardedIos = String.fromEnvironment('ADMOB_IOS_REWARDED_ID');
+  static const _interstitialAndroid = String.fromEnvironment('ADMOB_ANDROID_INTERSTITIAL_ID');
+  static const _interstitialIos = String.fromEnvironment('ADMOB_IOS_INTERSTITIAL_ID');
 
   static String? _pick(String testAndroid, String testIos, String prodAndroid, String prodIos) {
     if (useTestIds) return _android ? testAndroid : testIos;
@@ -61,4 +73,6 @@ class AdsConfig {
   static String? get bannerUnitId => _pick(_testBannerAndroid, _testBannerIos, _bannerAndroid, _bannerIos);
   static String? get nativeUnitId => _pick(_testNativeAndroid, _testNativeIos, _nativeAndroid, _nativeIos);
   static String? get rewardedUnitId => _pick(_testRewardedAndroid, _testRewardedIos, _rewardedAndroid, _rewardedIos);
+  static String? get interstitialUnitId =>
+      _pick(_testInterstitialAndroid, _testInterstitialIos, _interstitialAndroid, _interstitialIos);
 }

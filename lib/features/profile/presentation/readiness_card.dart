@@ -6,8 +6,7 @@ import '../../../core/theme/app_colors.dart';
 import '../../../core/widgets/love_ui.dart';
 import '../domain/profile_models.dart';
 
-void openProfileStep(BuildContext context, ProfileStep step) =>
-    context.push(step == ProfileStep.ageCheck ? Routes.ageCheck : Routes.editProfile);
+void openProfileStep(BuildContext context, ProfileStep step) => context.push(Routes.editProfile);
 
 /// "Why your profile isn't complete": each missing step with the reason and a
 /// tap target that goes straight to fixing it.
@@ -46,12 +45,7 @@ class ReadinessCard extends StatelessWidget {
             ),
           ),
           const SizedBox(height: 6),
-          for (final step in ProfileStep.values)
-            _StepRow(
-              step: step,
-              done: !missing.contains(step),
-              pending: step == ProfileStep.ageCheck && profile.ageCheck == AgeCheck.pending,
-            ),
+          for (final step in ProfileStep.values) _StepRow(step: step, done: !missing.contains(step)),
         ],
       ),
     );
@@ -59,10 +53,9 @@ class ReadinessCard extends StatelessWidget {
 }
 
 class _StepRow extends StatelessWidget {
-  const _StepRow({required this.step, required this.done, required this.pending});
+  const _StepRow({required this.step, required this.done});
   final ProfileStep step;
   final bool done;
-  final bool pending;
 
   @override
   Widget build(BuildContext context) {
@@ -79,12 +72,10 @@ class _StepRow extends StatelessWidget {
             AnimatedSwitcher(
               duration: const Duration(milliseconds: 250),
               child: Icon(
-                done
-                    ? (pending ? Icons.hourglass_top_rounded : Icons.check_circle_rounded)
-                    : Icons.radio_button_unchecked_rounded,
+                done ? Icons.check_circle_rounded : Icons.radio_button_unchecked_rounded,
                 key: ValueKey(done),
                 size: 22,
-                color: done ? (pending ? AppColors.undo : const Color(0xFF2EAD62)) : AppColors.rose,
+                color: done ? const Color(0xFF2EAD62) : AppColors.rose,
               ),
             ),
             const SizedBox(width: 12),
@@ -93,11 +84,11 @@ class _StepRow extends StatelessWidget {
                 crossAxisAlignment: CrossAxisAlignment.start,
                 children: [
                   Text(
-                    pending ? 'ID sent, we’re checking it' : step.title,
+                    step.title,
                     style: theme.textTheme.bodyLarge?.copyWith(
                       fontWeight: FontWeight.w700,
                       color: done ? muted : null,
-                      decoration: done && !pending ? TextDecoration.lineThrough : null,
+                      decoration: done ? TextDecoration.lineThrough : null,
                     ),
                   ),
                   if (!done) Text(step.why, style: theme.textTheme.bodySmall?.copyWith(color: muted)),
